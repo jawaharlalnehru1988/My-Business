@@ -1,0 +1,175 @@
+<div style="padding: 24px; max-width: 1200px; margin: 0 auto; font-family: sans-serif;">
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+    <h2 style="font-size: 24px; font-weight: bold; margin: 0; color: #1a1a1a;">Accounting & Finance</h2>
+    <button (click)="loadData()" style="background: #374151; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: bold;">
+      Refresh Data
+    </button>
+  </div>
+
+  <div style="display: flex; gap: 16px; margin-bottom: 24px; border-bottom: 1px solid #e5e7eb; padding-bottom: 8px;">
+    <button (click)="setTab('ledgers')" [style.color]="activeTab() === 'ledgers' ? '#2563eb' : '#6b7280'" [style.border-bottom]="activeTab() === 'ledgers' ? '2px solid #2563eb' : 'none'" style="background: none; border: none; font-size: 16px; font-weight: 600; cursor: pointer; padding: 8px 16px;">
+      Chart of Accounts
+    </button>
+    <button (click)="setTab('journal')" [style.color]="activeTab() === 'journal' ? '#2563eb' : '#6b7280'" [style.border-bottom]="activeTab() === 'journal' ? '2px solid #2563eb' : 'none'" style="background: none; border: none; font-size: 16px; font-weight: 600; cursor: pointer; padding: 8px 16px;">
+      Journal Entries
+    </button>
+  </div>
+
+  <div *ngIf="loading()" style="color: #6b7280; text-align: center; padding: 40px;">
+    Loading financial data...
+  </div>
+  
+  <div *ngIf="error()" style="color: #ef4444; background: #fee2e2; padding: 16px; border-radius: 8px; border: 1px solid #fca5a5; margin-bottom: 24px;">
+    {{ error() }}
+  </div>
+
+  <!-- Chart of Accounts Tab -->
+  <div *ngIf="!loading() && !error() && activeTab() === 'ledgers'" style="background: white; border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); overflow: hidden; border: 1px solid #e5e7eb;">
+    <table style="width: 100%; border-collapse: collapse; text-align: left;">
+      <thead style="background-color: #f9fafb; border-bottom: 1px solid #e5e7eb;">
+        <tr>
+          <th style="padding: 12px 24px; font-size: 12px; font-weight: 600; color: #6b7280; text-transform: uppercase;">ID</th>
+          <th style="padding: 12px 24px; font-size: 12px; font-weight: 600; color: #6b7280; text-transform: uppercase;">Ledger Name</th>
+          <th style="padding: 12px 24px; font-size: 12px; font-weight: 600; color: #6b7280; text-transform: uppercase;">Account Group</th>
+          <th style="padding: 12px 24px; font-size: 12px; font-weight: 600; color: #6b7280; text-transform: uppercase; text-align: right;">Current Balance</th>
+        </tr>
+      </thead>
+      <tbody style="background-color: white;">
+        <tr *ngFor="let ledger of ledgers()" style="border-bottom: 1px solid #e5e7eb; transition: background-color 0.2s;">
+          <td style="padding: 16px 24px; color: #374151;">{{ ledger.id }}</td>
+          <td style="padding: 16px 24px; font-weight: bold; color: #111827;">{{ ledger.name }}</td>
+          <td style="padding: 16px 24px;">
+            <span style="background: #e0e7ff; color: #4338ca; padding: 4px 8px; border-radius: 9999px; font-size: 12px; font-weight: bold;">
+              {{ ledger.accountGroup }}
+            </span>
+          </td>
+          <td style="padding: 16px 24px; font-weight: bold; text-align: right;" [style.color]="ledger.currentBalance >= 0 ? '#059669' : '#dc2626'">
+            {{ ledger.currentBalance | currency:'INR' }}
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Journal Entries Tab -->
+  <div *ngIf="!loading() && !error() && activeTab() === 'journal'" style="display: flex; flex-direction: column; gap: 24px;">
+    
+    <!-- Add Manual Entry Button & Form -->
+    <div style="background: white; border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); border: 1px solid #e5e7eb; overflow: hidden; padding: 24px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <h3 style="margin: 0; font-size: 18px; font-weight: bold;">Manual Journal Entry</h3>
+        <button (click)="toggleForm()" style="background: #2563eb; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: bold;">
+          {{ showForm() ? 'Cancel' : '+ Add Entry' }}
+        </button>
+      </div>
+
+      <div *ngIf="showForm()" style="margin-top: 16px; border-top: 1px solid #e5e7eb; padding-top: 16px;">
+        <div *ngIf="formError()" style="background: #fee2e2; color: #b91c1c; padding: 12px; border-radius: 6px; margin-bottom: 16px; font-size: 14px; border: 1px solid #f87171;">
+          {{ formError() }}
+        </div>
+        
+        <div style="display: grid; grid-template-columns: 1fr 2fr 1fr; gap: 16px; margin-bottom: 24px;">
+          <div>
+            <label style="display: block; margin-bottom: 8px; font-size: 14px; font-weight: 500;">Date *</label>
+            <input [(ngModel)]="newEntry().entryDate" type="date" style="width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px;">
+          </div>
+          <div>
+            <label style="display: block; margin-bottom: 8px; font-size: 14px; font-weight: 500;">Description *</label>
+            <input [(ngModel)]="newEntry().description" type="text" placeholder="e.g., Owner Capital Injection" style="width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px;">
+          </div>
+          <div>
+            <label style="display: block; margin-bottom: 8px; font-size: 14px; font-weight: 500;">Reference</label>
+            <input [(ngModel)]="newEntry().referenceNumber" type="text" placeholder="e.g., CHQ-123" style="width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px;">
+          </div>
+        </div>
+
+        <table style="width: 100%; border-collapse: collapse; text-align: left; margin-bottom: 16px;">
+          <thead style="background-color: #f9fafb; border-bottom: 1px solid #e5e7eb;">
+            <tr>
+              <th style="padding: 8px 12px; font-size: 12px; font-weight: 600; color: #6b7280; text-transform: uppercase;">Ledger Account</th>
+              <th style="padding: 8px 12px; font-size: 12px; font-weight: 600; color: #6b7280; text-transform: uppercase;">Debit (Dr)</th>
+              <th style="padding: 8px 12px; font-size: 12px; font-weight: 600; color: #6b7280; text-transform: uppercase;">Credit (Cr)</th>
+              <th style="padding: 8px 12px; font-size: 12px; font-weight: 600; color: #6b7280; text-transform: uppercase; width: 60px;"></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let line of newEntry().lines; let i = index" style="border-bottom: 1px solid #f3f4f6;">
+              <td style="padding: 8px 12px;">
+                <select [(ngModel)]="line.ledgerId" style="width: 100%; padding: 6px 8px; border: 1px solid #d1d5db; border-radius: 4px;">
+                  <option [ngValue]="0">Select Ledger...</option>
+                  <option *ngFor="let l of ledgers()" [ngValue]="l.id">{{ l.name }} ({{ l.accountGroup }})</option>
+                </select>
+              </td>
+              <td style="padding: 8px 12px;">
+                <input [(ngModel)]="line.debitAmount" type="number" min="0" style="width: 100%; padding: 6px 8px; border: 1px solid #d1d5db; border-radius: 4px;" (focus)="line.creditAmount = 0">
+              </td>
+              <td style="padding: 8px 12px;">
+                <input [(ngModel)]="line.creditAmount" type="number" min="0" style="width: 100%; padding: 6px 8px; border: 1px solid #d1d5db; border-radius: 4px;" (focus)="line.debitAmount = 0">
+              </td>
+              <td style="padding: 8px 12px; text-align: center;">
+                <button (click)="removeLine(i)" style="background: none; border: none; color: #ef4444; cursor: pointer; font-size: 16px;">&times;</button>
+              </td>
+            </tr>
+          </tbody>
+          <tfoot style="background-color: #f9fafb; font-weight: bold;">
+            <tr>
+              <td style="padding: 12px 12px; text-align: right;">Totals:</td>
+              <td style="padding: 12px 12px; color: #059669;">{{ formTotalDebits | currency:'INR' }}</td>
+              <td style="padding: 12px 12px; color: #dc2626;">{{ formTotalCredits | currency:'INR' }}</td>
+              <td></td>
+            </tr>
+            <tr *ngIf="formDifference > 0">
+              <td colspan="4" style="padding: 8px 12px; text-align: right; color: #b91c1c; font-size: 12px;">
+                Difference: {{ formDifference | currency:'INR' }} (Debits must equal Credits to post)
+              </td>
+            </tr>
+          </tfoot>
+        </table>
+
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <button (click)="addLine()" style="background: #f3f4f6; color: #4b5563; border: 1px solid #d1d5db; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-weight: 500; font-size: 14px;">+ Add Line</button>
+          
+          <button (click)="submitEntry()" [disabled]="submitting()" style="background: #10b981; color: white; border: none; padding: 10px 24px; border-radius: 6px; cursor: pointer; font-weight: bold;">
+            {{ submitting() ? 'Posting...' : 'Post Journal Entry' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- History List -->
+    <h3 style="margin-bottom: 0; font-size: 18px; font-weight: bold;">Recent Transactions</h3>
+    <div *ngFor="let entry of journalEntries()" style="background: white; border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); border: 1px solid #e5e7eb; overflow: hidden;">
+      <div style="background-color: #f9fafb; padding: 16px 24px; border-bottom: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center;">
+        <div>
+          <h4 style="margin: 0; font-size: 16px; font-weight: bold; color: #111827;">{{ entry.description }}</h4>
+          <div style="font-size: 12px; color: #6b7280; margin-top: 4px;">Date: {{ entry.entryDate }} | Ref: {{ entry.referenceNumber }}</div>
+        </div>
+        <div style="text-align: right;">
+          <div style="font-size: 12px; font-weight: bold; color: #059669;">Total Debit: {{ calculateTotalDebits(entry) | currency:'INR' }}</div>
+          <div style="font-size: 12px; font-weight: bold; color: #dc2626;">Total Credit: {{ calculateTotalCredits(entry) | currency:'INR' }}</div>
+        </div>
+      </div>
+      <table style="width: 100%; border-collapse: collapse; text-align: left;">
+        <thead style="background-color: white; border-bottom: 1px solid #e5e7eb;">
+          <tr>
+            <th style="padding: 8px 24px; font-size: 12px; font-weight: 600; color: #6b7280; text-transform: uppercase;">Ledger</th>
+            <th style="padding: 8px 24px; font-size: 12px; font-weight: 600; color: #6b7280; text-transform: uppercase; text-align: right;">Debit (Dr)</th>
+            <th style="padding: 8px 24px; font-size: 12px; font-weight: 600; color: #6b7280; text-transform: uppercase; text-align: right;">Credit (Cr)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let line of entry.lines" style="border-bottom: 1px solid #f3f4f6;">
+            <td style="padding: 12px 24px; color: #374151; font-weight: 500;">{{ line.ledgerName }}</td>
+            <td style="padding: 12px 24px; text-align: right; color: #059669; font-family: monospace;">{{ line.debitAmount > 0 ? (line.debitAmount | currency:'INR') : '-' }}</td>
+            <td style="padding: 12px 24px; text-align: right; color: #dc2626; font-family: monospace;">{{ line.creditAmount > 0 ? (line.creditAmount | currency:'INR') : '-' }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div *ngIf="journalEntries().length === 0" style="text-align: center; padding: 40px; color: #6b7280; background: white; border-radius: 8px; border: 1px solid #e5e7eb;">
+      No journal entries found. Generate some sales or purchases to see double-entry accounting in action!
+    </div>
+  </div>
+
+</div>

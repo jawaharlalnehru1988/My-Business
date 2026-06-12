@@ -1,0 +1,91 @@
+<div style="padding: 24px; max-width: 1200px; margin: 0 auto; font-family: sans-serif;">
+  
+  <div style="margin-bottom: 32px;">
+    <h2 style="font-size: 28px; font-weight: bold; margin: 0; color: #111827;">Executive Dashboard</h2>
+    <p style="color: #6b7280; margin-top: 8px;">Overview of your business metrics</p>
+  </div>
+
+  <div *ngIf="loading()" style="text-align: center; padding: 48px; color: #6b7280;">
+    Loading metrics...
+  </div>
+
+  <div *ngIf="error()" style="background: #fee2e2; color: #b91c1c; padding: 16px; border-radius: 8px; margin-bottom: 24px;">
+    {{ error() }}
+  </div>
+
+  <div *ngIf="metrics() && !loading()" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 24px; margin-bottom: 32px;">
+    
+    <!-- Total Sales -->
+    <div style="background: white; padding: 24px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); border: 1px solid #e5e7eb; border-top: 4px solid #10b981;">
+      <h3 style="margin: 0; font-size: 14px; font-weight: 600; color: #6b7280; text-transform: uppercase;">Total Sales (ex Tax)</h3>
+      <div style="font-size: 32px; font-weight: bold; color: #111827; margin-top: 12px;">
+        {{ metrics()!.totalSales | currency:'INR' }}
+      </div>
+    </div>
+
+    <!-- Total Purchases -->
+    <div style="background: white; padding: 24px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); border: 1px solid #e5e7eb; border-top: 4px solid #ef4444;">
+      <h3 style="margin: 0; font-size: 14px; font-weight: 600; color: #6b7280; text-transform: uppercase;">Total Purchases</h3>
+      <div style="font-size: 32px; font-weight: bold; color: #111827; margin-top: 12px;">
+        {{ metrics()!.totalPurchases | currency:'INR' }}
+      </div>
+    </div>
+
+    <!-- Cash Balance -->
+    <div style="background: white; padding: 24px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); border: 1px solid #e5e7eb; border-top: 4px solid #3b82f6;">
+      <h3 style="margin: 0; font-size: 14px; font-weight: 600; color: #6b7280; text-transform: uppercase;">Cash Balance</h3>
+      <div style="font-size: 32px; font-weight: bold; margin-top: 12px;" [style.color]="metrics()!.cashBalance >= 0 ? '#10b981' : '#ef4444'">
+        {{ metrics()!.cashBalance | currency:'INR' }}
+      </div>
+    </div>
+
+    <!-- Entity Count -->
+    <div style="background: white; padding: 24px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); border: 1px solid #e5e7eb; border-top: 4px solid #8b5cf6;">
+      <h3 style="margin: 0; font-size: 14px; font-weight: 600; color: #6b7280; text-transform: uppercase;">Network</h3>
+      <div style="display: flex; justify-content: space-between; margin-top: 16px;">
+        <div style="text-align: center;">
+          <div style="font-size: 24px; font-weight: bold; color: #111827;">{{ metrics()!.totalCustomers }}</div>
+          <div style="font-size: 12px; color: #6b7280;">Customers</div>
+        </div>
+        <div style="width: 1px; background: #e5e7eb;"></div>
+        <div style="text-align: center;">
+          <div style="font-size: 24px; font-weight: bold; color: #111827;">{{ metrics()!.totalSuppliers }}</div>
+          <div style="font-size: 12px; color: #6b7280;">Suppliers</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Low Stock Alerts -->
+  <div *ngIf="metrics() && !loading()" style="background: white; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); border: 1px solid #e5e7eb; overflow: hidden;">
+    <div style="padding: 16px 24px; border-bottom: 1px solid #e5e7eb; background: #fef2f2; display: flex; align-items: center; gap: 8px;">
+      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+      <h3 style="margin: 0; font-size: 16px; font-weight: bold; color: #991b1b;">Low Stock Alerts</h3>
+    </div>
+    
+    <table style="width: 100%; border-collapse: collapse; text-align: left;">
+      <thead style="background-color: #f9fafb;">
+        <tr>
+          <th style="padding: 12px 24px; font-size: 12px; font-weight: 600; color: #6b7280; text-transform: uppercase;">Product Name</th>
+          <th style="padding: 12px 24px; font-size: 12px; font-weight: 600; color: #6b7280; text-transform: uppercase;">SKU</th>
+          <th style="padding: 12px 24px; font-size: 12px; font-weight: 600; color: #6b7280; text-transform: uppercase;">Min Required</th>
+          <th style="padding: 12px 24px; font-size: 12px; font-weight: 600; color: #6b7280; text-transform: uppercase;">Current Stock</th>
+        </tr>
+      </thead>
+      <tbody style="background-color: white;">
+        <tr *ngFor="let item of metrics()!.lowStockItems" style="border-bottom: 1px solid #e5e7eb;">
+          <td style="padding: 16px 24px; font-weight: 500; color: #111827;">{{ item.productName }}</td>
+          <td style="padding: 16px 24px; color: #4b5563;">{{ item.sku }}</td>
+          <td style="padding: 16px 24px; color: #6b7280;">{{ item.minimumStock }}</td>
+          <td style="padding: 16px 24px; font-weight: bold; color: #ef4444;">{{ item.currentStock }}</td>
+        </tr>
+        <tr *ngIf="metrics()!.lowStockItems.length === 0">
+          <td colspan="4" style="padding: 32px 24px; text-align: center; color: #10b981; font-weight: 500;">
+            All stock levels are optimal. No alerts!
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+</div>

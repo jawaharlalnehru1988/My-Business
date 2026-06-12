@@ -1,0 +1,55 @@
+<div style="min-height: 100vh; display: flex; align-items: center; justify-content: center; background-color: #f3f4f6; font-family: sans-serif; padding: 24px;">
+  <div style="background: white; padding: 40px; border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); width: 100%; max-width: 600px;">
+    <h2 style="margin-top: 0; margin-bottom: 8px; font-size: 24px; font-weight: bold; color: #111827; text-align: center;">Register Your Business</h2>
+    <p style="text-align: center; color: #6b7280; margin-bottom: 24px; font-size: 14px;">Create an account to start managing your accounting</p>
+    
+    <div *ngIf="errorMessage()" style="background: #fee2e2; color: #b91c1c; padding: 12px; border-radius: 6px; margin-bottom: 16px; font-size: 14px; text-align: center;">
+      {{ errorMessage() }}
+    </div>
+
+    <form (ngSubmit)="register()">
+      
+      <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 16px; color: #1f2937; border-bottom: 1px solid #e5e7eb; padding-bottom: 8px;">Account Details</h3>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px;">
+        <div>
+          <label style="display: block; margin-bottom: 8px; font-size: 14px; font-weight: 500; color: #374151;">Email</label>
+          <input [(ngModel)]="request.email" name="email" type="email" required style="width: 100%; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 6px; box-sizing: border-box;" placeholder="you@example.com">
+        </div>
+        <div>
+          <label style="display: block; margin-bottom: 8px; font-size: 14px; font-weight: 500; color: #374151;">Password</label>
+          <input [(ngModel)]="request.password" name="password" type="password" required style="width: 100%; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 6px; box-sizing: border-box;" placeholder="••••••••">
+        </div>
+      </div>
+
+      <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 16px; color: #1f2937; border-bottom: 1px solid #e5e7eb; padding-bottom: 8px;">Business Profile</h3>
+      <div style="margin-bottom: 16px;">
+        <label style="display: block; margin-bottom: 8px; font-size: 14px; font-weight: 500; color: #374151;">Business Name *</label>
+        <input [(ngModel)]="request.businessName" name="businessName" type="text" required style="width: 100%; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 6px; box-sizing: border-box;" placeholder="e.g. Acme Corp">
+      </div>
+      
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
+        <div>
+          <label style="display: block; margin-bottom: 8px; font-size: 14px; font-weight: 500; color: #374151;">GST Number</label>
+          <input [(ngModel)]="request.gstNumber" name="gstNumber" type="text" style="width: 100%; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 6px; box-sizing: border-box;" placeholder="Optional">
+        </div>
+        <div>
+          <label style="display: block; margin-bottom: 8px; font-size: 14px; font-weight: 500; color: #374151;">Phone</label>
+          <input [(ngModel)]="request.contactInfo" name="contactInfo" type="text" style="width: 100%; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 6px; box-sizing: border-box;" placeholder="Optional">
+        </div>
+      </div>
+
+      <div style="margin-bottom: 24px;">
+        <label style="display: block; margin-bottom: 8px; font-size: 14px; font-weight: 500; color: #374151;">Address</label>
+        <textarea [(ngModel)]="request.address" name="address" rows="3" style="width: 100%; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 6px; box-sizing: border-box;" placeholder="Optional"></textarea>
+      </div>
+      
+      <button type="submit" style="width: 100%; background: #10b981; color: white; border: none; padding: 12px; border-radius: 6px; font-size: 16px; font-weight: bold; cursor: pointer; transition: background-color 0.2s;">
+        Create Account
+      </button>
+    </form>
+    
+    <div style="margin-top: 24px; text-align: center; font-size: 14px; color: #4b5563;">
+      Already have an account? <a routerLink="/login" style="color: #3b82f6; text-decoration: none; font-weight: 500;">Sign in here</a>
+    </div>
+  </div>
+</div>

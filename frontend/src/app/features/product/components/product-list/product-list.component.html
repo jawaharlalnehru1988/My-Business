@@ -1,0 +1,133 @@
+<div style="padding: 24px; max-width: 1200px; margin: 0 auto; font-family: sans-serif;">
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+    <h2 style="font-size: 24px; font-weight: bold; margin: 0; color: #1a1a1a;">Product Master</h2>
+    <button (click)="toggleForm()" style="background: #2563eb; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: bold;">
+      {{ showForm() ? 'Cancel' : '+ Add Product' }}
+    </button>
+  </div>
+
+  <!-- Add Product Form -->
+  <div *ngIf="showForm()" style="background: white; padding: 24px; border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); margin-bottom: 24px; border: 1px solid #e5e7eb;">
+    <h3 style="margin-top: 0; margin-bottom: 16px; font-size: 18px; font-weight: 600;">{{ editingProductId() ? 'Edit Product' : 'Add New Product' }}</h3>
+    
+    <div *ngIf="errorMessage()" style="background: #fee2e2; color: #b91c1c; padding: 12px; border-radius: 6px; margin-bottom: 16px; font-size: 14px; border: 1px solid #f87171;">
+      {{ errorMessage() }}
+    </div>
+
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
+      <div>
+        <label style="display: block; margin-bottom: 8px; font-size: 14px; font-weight: 500;">Product Name *</label>
+        <input [(ngModel)]="newProduct.name" type="text" style="width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px;" placeholder="e.g. Premium Notebook">
+      </div>
+      <div>
+        <label style="display: block; margin-bottom: 8px; font-size: 14px; font-weight: 500;">Base Price (INR) *</label>
+        <input [(ngModel)]="newProduct.basePrice" type="number" style="width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px;" placeholder="0.00">
+      </div>
+      <div>
+        <label style="display: block; margin-bottom: 8px; font-size: 14px; font-weight: 500;">SKU</label>
+        <input [(ngModel)]="newProduct.sku" type="text" style="width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px;" placeholder="e.g. NB-PREM-01">
+      </div>
+      <div>
+        <label style="display: block; margin-bottom: 8px; font-size: 14px; font-weight: 500;">HSN/SAC Code</label>
+        <input [(ngModel)]="newProduct.hsnSac" type="text" style="width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px;" placeholder="e.g. 4820">
+      </div>
+      <div>
+        <label style="display: block; margin-bottom: 8px; font-size: 14px; font-weight: 500;">CGST (%)</label>
+        <input [(ngModel)]="newProduct.cgstPercentage" type="number" style="width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px;" placeholder="9">
+      </div>
+      <div>
+        <label style="display: block; margin-bottom: 8px; font-size: 14px; font-weight: 500;">SGST (%)</label>
+        <input [(ngModel)]="newProduct.sgstPercentage" type="number" style="width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px;" placeholder="9">
+      </div>
+      <div>
+        <label style="display: block; margin-bottom: 8px; font-size: 14px; font-weight: 500;">IGST (%)</label>
+        <input [(ngModel)]="newProduct.igstPercentage" type="number" style="width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px;" placeholder="18">
+      </div>
+      <div>
+        <label style="display: block; margin-bottom: 8px; font-size: 14px; font-weight: 500;">Discount (%)</label>
+        <input [(ngModel)]="newProduct.discountPercentage" type="number" style="width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px;" placeholder="10">
+      </div>
+      <div>
+        <label style="display: block; margin-bottom: 8px; font-size: 14px; font-weight: 500;">Expiry Date</label>
+        <input [(ngModel)]="newProduct.expiryDate" type="date" style="width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px;">
+      </div>
+    </div>
+    <button (click)="saveProduct()" [disabled]="submitting()" style="background: #10b981; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: bold;">
+      {{ submitting() ? 'Saving...' : (editingProductId() ? 'Update Product' : 'Save Product') }}
+    </button>
+  </div>
+  
+  <div *ngIf="loading()" style="color: #6b7280; text-align: center; padding: 40px;">
+    Loading products...
+  </div>
+  
+  <div *ngIf="error()" style="color: #ef4444; background: #fee2e2; padding: 16px; border-radius: 8px; border: 1px solid #fca5a5; margin-bottom: 24px;">
+    {{ error() }}
+  </div>
+
+  <div *ngIf="!loading() && !error()" style="background: white; border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); overflow: hidden; border: 1px solid #e5e7eb;">
+    <table style="width: 100%; border-collapse: collapse; text-align: left;">
+      <thead style="background-color: #f9fafb; border-bottom: 1px solid #e5e7eb;">
+        <tr>
+          <th style="padding: 12px 24px; font-size: 12px; font-weight: 600; color: #6b7280; text-transform: uppercase;">ID</th>
+          <th style="padding: 12px 24px; font-size: 12px; font-weight: 600; color: #6b7280; text-transform: uppercase;">Name</th>
+          <th style="padding: 12px 24px; font-size: 12px; font-weight: 600; color: #6b7280; text-transform: uppercase;">SKU</th>
+          <th style="padding: 12px 24px; font-size: 12px; font-weight: 600; color: #6b7280; text-transform: uppercase;">HSN/SAC</th>
+          <th style="padding: 12px 24px; font-size: 12px; font-weight: 600; color: #6b7280; text-transform: uppercase;">Base Price</th>
+          <th style="padding: 12px 24px; font-size: 12px; font-weight: 600; color: #6b7280; text-transform: uppercase;">GST %</th>
+          <th style="padding: 12px 24px; font-size: 12px; font-weight: 600; color: #6b7280; text-transform: uppercase; text-align: right;">Actions</th>
+        </tr>
+      </thead>
+      <tbody style="background-color: white;">
+        <tr *ngFor="let product of products()" style="border-bottom: 1px solid #e5e7eb; transition: background-color 0.2s;">
+          <td style="padding: 16px 24px; color: #374151;">{{ product.id }}</td>
+          <td style="padding: 16px 24px; font-weight: 500; color: #111827;">{{ product.name }}</td>
+          <td style="padding: 16px 24px; color: #4b5563;">{{ product.sku }}</td>
+          <td style="padding: 16px 24px; color: #4b5563;">{{ product.hsnSac }}</td>
+          <td style="padding: 16px 24px; font-weight: bold; color: #059669;">{{ product.basePrice | currency:'INR' }}</td>
+          <td style="padding: 16px 24px; font-weight: bold; color: #ef4444;">{{ (product.cgstPercentage || 0) + (product.sgstPercentage || 0) }}%</td>
+          <td style="padding: 16px 24px; text-align: right;">
+            <button (click)="editProduct(product)" style="background: #3b82f6; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: bold; margin-right: 8px;">Edit</button>
+            <button *ngIf="product.sku" (click)="viewBarcode(product)" style="background: #e5e7eb; color: #374151; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: bold;">View Barcode</button>
+          </td>
+        </tr>
+        <tr *ngIf="products().length === 0">
+          <td colspan="5" style="padding: 32px 24px; text-align: center; color: #6b7280;">
+            No products found. Add a new product to get started!
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Barcode Modal -->
+  <!-- Barcode Modal -->
+  <div *ngIf="selectedBarcodeImage()" style="position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 50;">
+    <div style="background: white; padding: 32px; border-radius: 8px; text-align: center; max-width: 400px; width: 100%;">
+      <h3 style="margin-top: 0; font-size: 18px; font-weight: bold; margin-bottom: 24px;">Generated Barcode</h3>
+      
+      <!-- Label Container -->
+      <div id="barcode-label" style="border: 1px dashed #ccc; padding: 16px; border-radius: 8px; text-align: center; width: 250px; margin: 0 auto; background: white;">
+        <h4 style="margin: 0 0 8px 0; font-size: 14px; font-weight: 500;">{{ activeTenant()?.businessName || 'Default Business' }}</h4>
+        <img [src]="selectedBarcodeImage()" alt="Barcode" style="width: 100%; height: 30px; margin-bottom: 4px;" />
+        <div style="font-size: 14px; font-weight: bold; margin-bottom: 4px; letter-spacing: 1px;">{{ selectedBarcodeProduct()?.sku }}</div>
+        <div style="font-size: 12px; margin-bottom: 4px; color: #374151;">{{ selectedBarcodeProduct()?.name }}</div>
+        <div style="font-size: 12px; margin-bottom: 4px; color: #111827;">
+          Sale Price: <span [style.textDecoration]="selectedBarcodeProduct()?.discountPercentage ? 'line-through' : 'none'">{{ selectedBarcodeProduct()?.basePrice | currency:'INR' }}</span>
+        </div>
+        <div *ngIf="selectedBarcodeProduct()?.discountPercentage" style="font-size: 12px; font-weight: bold; color: #059669; margin-bottom: 4px;">
+          Discount: {{ selectedBarcodeProduct()?.discountPercentage }}%, Price: {{ getDiscountedPrice(selectedBarcodeProduct()!) | currency:'INR' }}
+        </div>
+        <div *ngIf="selectedBarcodeProduct()?.expiryDate" style="font-size: 12px; font-weight: bold; color: #dc2626;">
+          Best Before: {{ selectedBarcodeProduct()?.expiryDate | date:'MM/yyyy' }}
+        </div>
+      </div>
+
+      <div style="display: flex; gap: 12px; margin-top: 24px;">
+        <button (click)="printBarcode()" style="flex: 1; background: #2563eb; color: white; border: none; padding: 10px; border-radius: 6px; cursor: pointer; font-weight: bold;">Print</button>
+        <button (click)="downloadBarcode()" style="flex: 1; background: #10b981; color: white; border: none; padding: 10px; border-radius: 6px; cursor: pointer; font-weight: bold;">Download</button>
+      </div>
+      <button (click)="closeBarcode()" style="margin-top: 12px; background: #374151; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: bold; width: 100%;">Close</button>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,40 @@
+<div style="min-height: 100vh; background-color: #f3f4f6;">
+  <!-- Simple Header (Only shown when authenticated) -->
+  <header *ngIf="authService.isAuthenticated()" style="background: white; padding: 16px 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); display: flex; align-items: center; border-bottom: 1px solid #e5e7eb;">
+    <h1 style="margin: 0; font-size: 20px; font-weight: bold; color: #2563eb; font-family: sans-serif;">My Business</h1>
+    
+    <nav *ngIf="!authService.isSuperAdmin() || authService.selectedAdminTenantId()" style="margin-left: 32px; display: flex; gap: 16px; flex: 1;">
+      <a href="/dashboard" style="color: #4b5563; text-decoration: none; font-weight: 500; font-family: sans-serif; padding: 8px 12px; border-radius: 6px; background: #f3f4f6;">Dashboard</a>
+      <a href="/products" style="color: #4b5563; text-decoration: none; font-weight: 500; font-family: sans-serif; padding: 8px 12px; border-radius: 6px; background: #f3f4f6;">Products</a>
+      <a href="/inventory" style="color: #4b5563; text-decoration: none; font-weight: 500; font-family: sans-serif; padding: 8px 12px; border-radius: 6px; background: #f3f4f6;">Inventory</a>
+      <a href="/purchases" style="color: #4b5563; text-decoration: none; font-weight: 500; font-family: sans-serif; padding: 8px 12px; border-radius: 6px; background: #f3f4f6;">Purchases</a>
+      <a href="/sales" style="color: #4b5563; text-decoration: none; font-weight: 500; font-family: sans-serif; padding: 8px 12px; border-radius: 6px; background: #f3f4f6;">Sales / POS</a>
+      <a href="/accounting" style="color: #4b5563; text-decoration: none; font-weight: 500; font-family: sans-serif; padding: 8px 12px; border-radius: 6px; background: #f3f4f6;">Accounting</a>
+    </nav>
+    <div *ngIf="authService.isSuperAdmin() && !authService.selectedAdminTenantId()" style="flex: 1;"></div>
+
+    <div style="display: flex; align-items: center; gap: 16px;">
+      <div style="font-size: 14px; font-weight: 600; color: #374151;">
+        {{ authService.currentUser()?.businessName }}
+        <span *ngIf="authService.isSuperAdmin()" style="background: #fee2e2; color: #b91c1c; padding: 2px 6px; border-radius: 4px; font-size: 12px; margin-left: 8px;">ADMIN</span>
+      </div>
+      
+      <a *ngIf="!authService.isSuperAdmin()" href="/settings/business-profiles" style="color: #4b5563; text-decoration: none; padding: 8px; border-radius: 6px; background: #f3f4f6; display: flex; align-items: center;" title="Business Settings">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      </a>
+
+      <button *ngIf="authService.selectedAdminTenantId()" (click)="stopViewingBusiness()" style="background: #ef4444; color: white; border: none; padding: 6px 12px; border-radius: 6px; font-weight: 500; cursor: pointer;">
+        Exit View
+      </button>
+
+      <button (click)="logout()" style="background: none; border: 1px solid #d1d5db; color: #374151; padding: 6px 12px; border-radius: 6px; font-weight: 500; cursor: pointer;">
+        Logout
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Content Route Outlet -->
+  <main>
+    <router-outlet></router-outlet>
+  </main>
+</div>
