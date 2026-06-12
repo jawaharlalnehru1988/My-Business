@@ -19,7 +19,7 @@ export class AdminDashboardComponent implements OnInit {
   loading = signal<boolean>(true);
 
   ngOnInit() {
-    this.http.get<Tenant[]>('http://localhost:8080/api/v1/admin/tenants').subscribe({
+    this.http.get<Tenant[]>('https://business.asknehru.com/api/v1/admin/tenants').subscribe({
       next: (data) => {
         this.tenants.set(data);
         this.loading.set(false);

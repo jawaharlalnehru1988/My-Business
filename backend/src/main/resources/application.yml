@@ -1,18 +1,27 @@
 spring:
   datasource:
     url: jdbc:postgresql://localhost:5432/accounting_db
-    username: postgres
-    password: password
+    username: accounting_user
+    password: Accounting@2024Secure
     driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+      connection-timeout: 30000
   jpa:
     hibernate:
       ddl-auto: update
-    show-sql: true
+    show-sql: false
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
     properties:
       hibernate:
-        format_sql: true
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: false
+        jdbc:
+          lob:
+            non_contextual_creation: true
   flyway:
-    enabled: false # Temporarily disabled for rapid MVP development; we'll rely on hibernate auto-update
+    enabled: false
 
 server:
-  port: 8080
+  port: 8090

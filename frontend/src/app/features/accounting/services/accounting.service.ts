@@ -8,7 +8,7 @@ import { Ledger, JournalEntry } from '../models/accounting.model';
 })
 export class AccountingService {
   private http = inject(HttpClient);
-  private apiUrl = 'http://localhost:8080/api/v1/accounting';
+  private apiUrl = 'https://business.asknehru.com/api/v1/accounting';
 
   getLedgers(): Observable<Ledger[]> {
     return this.http.get<Ledger[]>(`${this.apiUrl}/ledgers`);

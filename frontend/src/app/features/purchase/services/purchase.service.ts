@@ -8,7 +8,7 @@ import { Supplier, PurchaseOrder, PurchaseOrderCreateRequest } from '../models/p
 })
 export class PurchaseService {
   private http = inject(HttpClient);
-  private apiUrl = 'http://localhost:8080/api/v1/purchases';
+  private apiUrl = 'https://business.asknehru.com/api/v1/purchases';
 
   getSuppliers(): Observable<Supplier[]> {
     return this.http.get<Supplier[]>(`${this.apiUrl}/suppliers`);

@@ -8,7 +8,7 @@ import { Tenant } from '../models/tenant.model';
 })
 export class TenantService {
   private http = inject(HttpClient);
-  private apiUrl = 'http://localhost:8080/api/v1/tenants';
+  private apiUrl = 'https://business.asknehru.com/api/v1/tenants';
 
   // BehaviorSubject to broadcast tenant changes to the whole app
   private activeTenantIdSubject = new BehaviorSubject<number | null>(this.getStoredTenantId());

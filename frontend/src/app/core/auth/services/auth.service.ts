@@ -7,7 +7,7 @@ import { AuthRequest, AuthResponse, RegisterRequest } from '../models/auth.model
   providedIn: 'root'
 })
 export class AuthService {
-  private apiUrl = 'http://localhost:8080/api/v1/auth';
+  private apiUrl = 'https://business.asknehru.com/api/v1/auth';
   
   public currentUser = signal<AuthResponse | null>(null);
   public selectedAdminTenantId = signal<number | null>(null);

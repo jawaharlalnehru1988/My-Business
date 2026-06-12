@@ -8,7 +8,7 @@ import { Customer, SaleOrder, SaleOrderCreateRequest } from '../models/sales.mod
 })
 export class SalesService {
   private http = inject(HttpClient);
-  private apiUrl = 'http://localhost:8080/api/v1/sales';
+  private apiUrl = 'https://business.asknehru.com/api/v1/sales';
 
   getCustomers(): Observable<Customer[]> {
     return this.http.get<Customer[]>(`${this.apiUrl}/customers`);

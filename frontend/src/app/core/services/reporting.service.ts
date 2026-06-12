@@ -23,7 +23,7 @@ export interface DashboardMetrics {
 })
 export class ReportingService {
   private http = inject(HttpClient);
-  private apiUrl = 'http://localhost:8080/api/v1/reports';
+  private apiUrl = 'https://business.asknehru.com/api/v1/reports';
 
   getDashboardMetrics(): Observable<DashboardMetrics> {
     return this.http.get<DashboardMetrics>(`${this.apiUrl}/dashboard`);
