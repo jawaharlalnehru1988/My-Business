@@ -1,0 +1,25 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: api-gateway
+  cloud:
+    gateway:
+      routes:
+        - id: accounting-service
+          uri: lb://ACCOUNTING-SERVICE
+          predicates:
+            - Path=/api/accounting/**
+        - id: monolith-backend
+          uri: lb://MONOLITH-BACKEND
+          predicates:
+            - Path=/api/**
+      discovery:
+        locator:
+          enabled: true
+
+eureka:
+  client:
+    serviceUrl:
+      defaultZone: http://localhost:8761/eureka/

@@ -7,4 +7,5 @@ import java.util.List;
 
 public interface PurchaseOrderRepository extends JpaRepository<PurchaseOrder, Long> {
     List<PurchaseOrder> findByTenantId(Long tenantId);
+    java.util.Optional<PurchaseOrder> findByOrderNumber(String orderNumber);
 }

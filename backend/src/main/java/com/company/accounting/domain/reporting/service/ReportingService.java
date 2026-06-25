@@ -1,8 +1,7 @@
 package com.company.accounting.domain.reporting.service;
 
 import com.company.accounting.core.tenant.TenantContext;
-import com.company.accounting.domain.accounting.entity.Ledger;
-import com.company.accounting.domain.accounting.repository.LedgerRepository;
+
 import com.company.accounting.domain.inventory.entity.StockTransaction;
 import com.company.accounting.domain.inventory.repository.StockTransactionRepository;
 import com.company.accounting.domain.product.entity.Product;
@@ -30,7 +29,6 @@ public class ReportingService {
     private final PurchaseOrderRepository purchaseOrderRepository;
     private final CustomerRepository customerRepository;
     private final SupplierRepository supplierRepository;
-    private final LedgerRepository ledgerRepository;
     private final ProductRepository productRepository;
     private final StockTransactionRepository stockTransactionRepository;
 
@@ -49,10 +47,8 @@ public class ReportingService {
                 .map(PurchaseOrder::getTotalAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        // Cash Balance
-        Ledger cashLedger = ledgerRepository.findByNameAndTenantId("Cash", tenantId)
-                .orElse(null);
-        BigDecimal cashBalance = cashLedger != null ? cashLedger.getCurrentBalance() : BigDecimal.ZERO;
+        // Cash Balance (Now maintained by Accounting Microservice)
+        BigDecimal cashBalance = BigDecimal.ZERO; 
 
         // Customers & Suppliers
         long customers = customerRepository.findByTenantId(tenantId).size();

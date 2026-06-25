@@ -10,10 +10,9 @@ import com.company.accounting.domain.sales.entity.SaleOrder;
 import com.company.accounting.domain.sales.entity.SaleOrderItem;
 import com.company.accounting.domain.sales.repository.CustomerRepository;
 import com.company.accounting.domain.sales.repository.SaleOrderRepository;
-import com.company.accounting.domain.accounting.service.AccountingService;
-import com.company.accounting.domain.accounting.dto.JournalEntryCreateRequest;
-import com.company.accounting.domain.accounting.dto.JournalEntryLineRequest;
-import com.company.accounting.domain.accounting.entity.Ledger;
+import com.company.accounting.integration.dto.JournalEntryCreateRequest;
+import com.company.accounting.integration.dto.JournalEntryLineRequest;
+import com.company.accounting.integration.producer.MonolithEventProducer;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,7 +33,7 @@ public class SaleOrderService {
     private final CustomerRepository customerRepository;
     private final ProductRepository productRepository;
     private final InventoryService inventoryService;
-    private final AccountingService accountingService;
+    private final MonolithEventProducer monolithEventProducer;
 
     public List<SaleOrder> getAllSaleOrders() {
         return saleOrderRepository.findByTenantId(TenantContext.getCurrentTenant());
@@ -106,30 +105,35 @@ public class SaleOrderService {
         order.setGrandTotal(totalAmount.add(totalTax));
         SaleOrder savedOrder = saleOrderRepository.save(order);
 
-        // Core Accounting Integration
-        Ledger cashLedger = accountingService.getOrCreateLedger("Cash", "ASSET");
-        Ledger salesLedger = accountingService.getOrCreateLedger("Sales", "INCOME");
-        Ledger taxLedger = accountingService.getOrCreateLedger("Output Tax (GST)", "LIABILITY");
-
+        // Core Accounting Integration via Kafka Event
         JournalEntryCreateRequest jeRequest = new JournalEntryCreateRequest();
         jeRequest.setEntryDate(savedOrder.getSaleDate());
         jeRequest.setDescription("POS Sale - " + savedOrder.getInvoiceNumber());
         jeRequest.setReferenceNumber(savedOrder.getInvoiceNumber());
 
         JournalEntryLineRequest debitCash = new JournalEntryLineRequest();
-        debitCash.setLedgerId(cashLedger.getId());
+        debitCash.setLedgerName("Cash");
         debitCash.setDebitAmount(savedOrder.getGrandTotal());
 
         JournalEntryLineRequest creditSales = new JournalEntryLineRequest();
-        creditSales.setLedgerId(salesLedger.getId());
+        creditSales.setLedgerName("Sales");
         creditSales.setCreditAmount(savedOrder.getTotalAmount());
 
         JournalEntryLineRequest creditTax = new JournalEntryLineRequest();
-        creditTax.setLedgerId(taxLedger.getId());
+        creditTax.setLedgerName("Output Tax (GST)");
         creditTax.setCreditAmount(savedOrder.getTotalTax());
 
         jeRequest.setLines(java.util.Arrays.asList(debitCash, creditSales, creditTax));
-        accountingService.postJournalEntry(jeRequest);
+        
+        com.company.accounting.integration.event.JournalEntryEvent event = 
+                com.company.accounting.integration.event.JournalEntryEvent.builder()
+                .transactionId(savedOrder.getInvoiceNumber())
+                .eventType("CREATE_JOURNAL_ENTRY")
+                .tenantId(TenantContext.getCurrentTenant())
+                .request(jeRequest)
+                .build();
+                
+        monolithEventProducer.publishEvent(event);
 
         return savedOrder;
     }
