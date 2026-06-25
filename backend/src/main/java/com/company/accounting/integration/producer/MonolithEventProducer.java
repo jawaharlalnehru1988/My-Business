@@ -11,7 +11,7 @@ import org.springframework.stereotype.Service;
 @Slf4j
 public class MonolithEventProducer {
 
-    private final KafkaTemplate<String, JournalEntryEvent> kafkaTemplate;
+    private final KafkaTemplate<String, Object> kafkaTemplate;
     private static final String TOPIC = "monolith-events";
 
     public void publishEvent(JournalEntryEvent event) {

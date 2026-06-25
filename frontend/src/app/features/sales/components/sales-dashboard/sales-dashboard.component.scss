@@ -1,0 +1,223 @@
+
+  .vyapar-container {
+    background-color: #f3f4f6;
+    min-height: 100vh;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    color: #333;
+    padding-bottom: 80px;
+  }
+  .vyapar-header {
+    background: white;
+    padding: 12px 24px;
+    display: flex;
+    align-items: center;
+    border-bottom: 1px solid #e5e7eb;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+  }
+  .vyapar-header h2 {
+    margin: 0;
+    font-size: 20px;
+    font-weight: 600;
+    margin-right: 32px;
+  }
+  .toggle-container {
+    display: flex;
+    align-items: center;
+    font-size: 14px;
+    color: #4b5563;
+  }
+  .toggle-switch {
+    width: 40px;
+    height: 20px;
+    background-color: #3b82f6;
+    border-radius: 20px;
+    margin: 0 12px;
+    position: relative;
+    cursor: pointer;
+  }
+  .toggle-knob {
+    width: 16px;
+    height: 16px;
+    background: white;
+    border-radius: 50%;
+    position: absolute;
+    top: 2px;
+    left: 2px;
+  }
+  .top-section {
+    padding: 24px;
+    display: flex;
+    justify-content: space-between;
+  }
+  .search-box {
+    display: flex;
+    gap: 16px;
+  }
+  .form-control {
+    padding: 4px 8px;
+    border: 1px solid #d1d5db;
+    border-radius: 4px;
+    font-size: 13px;
+    outline: none;
+    background: white;
+  }
+  .form-control:focus {
+    border-color: #3b82f6;
+  }
+  .invoice-details {
+    display: grid;
+    grid-template-columns: 120px 200px;
+    gap: 12px;
+    align-items: center;
+    font-size: 13px;
+    color: #6b7280;
+  }
+  .invoice-details .form-control {
+    width: 100%;
+    box-sizing: border-box;
+  }
+  .items-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: white;
+    font-size: 13px;
+  }
+  .items-table th {
+    background-color: #f9fafb;
+    border-top: 1px solid #e5e7eb;
+    border-bottom: 1px solid #e5e7eb;
+    border-right: 1px solid #e5e7eb;
+    padding: 12px 8px;
+    text-align: left;
+    color: #4b5563;
+    font-weight: 600;
+  }
+  .items-table td {
+    border-bottom: 1px solid #e5e7eb;
+    border-right: 1px solid #e5e7eb;
+    padding: 8px;
+  }
+  .items-table input, .items-table select {
+    width: 100%;
+    border: none;
+    outline: none;
+    background: transparent;
+    font-size: 13px;
+  }
+  .items-table .cell-flex {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  .items-table td:last-child, .items-table th:last-child {
+    border-right: none;
+  }
+  .add-row-btn {
+    background: transparent;
+    border: 1px solid #e5e7eb;
+    color: #3b82f6;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: 500;
+    margin: 16px 24px;
+  }
+  .footer-section {
+    padding: 24px;
+    display: flex;
+    justify-content: space-between;
+    margin-top: 24px;
+  }
+  .terms-box {
+    width: 400px;
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .terms-header {
+    background: #f9fafb;
+    padding: 12px 16px;
+    border-bottom: 1px solid #e5e7eb;
+    font-weight: 600;
+    color: #4b5563;
+    font-size: 14px;
+  }
+  .terms-content {
+    padding: 16px;
+    font-size: 13px;
+    color: #374151;
+    min-height: 80px;
+  }
+  .action-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .action-btn {
+    background: transparent;
+    border: 1px solid #d1d5db;
+    padding: 8px 16px;
+    border-radius: 4px;
+    color: #4b5563;
+    font-size: 13px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .totals-box {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    font-size: 16px;
+    font-weight: 600;
+  }
+  .totals-box .amount-input {
+    border: 1px solid #d1d5db;
+    border-radius: 4px;
+    padding: 8px 16px;
+    background: white;
+    width: 150px;
+    text-align: right;
+  }
+  .bottom-bar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: white;
+    padding: 12px 24px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    box-shadow: 0 -1px 4px rgba(0,0,0,0.05);
+    border-top: 1px solid #e5e7eb;
+  }
+  .btn-share {
+    background: white;
+    border: 1px solid #3b82f6;
+    color: #3b82f6;
+    padding: 8px 24px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: 500;
+  }
+  .btn-save {
+    background: #3b82f6;
+    border: none;
+    color: white;
+    padding: 8px 32px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: 500;
+  }
+  .delete-icon {
+    color: #ef4444;
+    cursor: pointer;
+    font-size: 16px;
+    font-weight: bold;
+    background: none;
+    border: none;
+  }
+

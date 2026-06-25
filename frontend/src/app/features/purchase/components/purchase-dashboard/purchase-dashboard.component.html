@@ -1,5 +1,5 @@
 <div style="padding: 24px; max-width: 1200px; margin: 0 auto; font-family: sans-serif;">
-  
+
   <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
     <h2 style="font-size: 24px; font-weight: bold; margin: 0; color: #1a1a1a;">Purchase & Suppliers</h2>
     <div>
@@ -13,100 +13,108 @@
   </div>
 
   <!-- Create Supplier Form -->
-  <div *ngIf="showSupplierForm()" style="background: white; padding: 24px; border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); margin-bottom: 24px; border: 1px solid #e5e7eb;">
-    <h3 style="margin-top: 0; margin-bottom: 16px; font-size: 18px; font-weight: 600;">Add New Supplier</h3>
-    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
-      <div>
-        <label style="display: block; margin-bottom: 8px; font-size: 14px; font-weight: 500;">Supplier Name *</label>
-        <input [(ngModel)]="newSupplier.name" type="text" style="width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px;">
+  @if (showSupplierForm()) {
+    <div style="background: white; padding: 24px; border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); margin-bottom: 24px; border: 1px solid #e5e7eb;">
+      <h3 style="margin-top: 0; margin-bottom: 16px; font-size: 18px; font-weight: 600;">Add New Supplier</h3>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
+        <div>
+          <label style="display: block; margin-bottom: 8px; font-size: 14px; font-weight: 500;">Supplier Name *</label>
+          <input [(ngModel)]="newSupplier.name" type="text" style="width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px;">
+        </div>
+        <div>
+          <label style="display: block; margin-bottom: 8px; font-size: 14px; font-weight: 500;">Contact Person</label>
+          <input [(ngModel)]="newSupplier.contactPerson" type="text" style="width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px;">
+        </div>
+        <div>
+          <label style="display: block; margin-bottom: 8px; font-size: 14px; font-weight: 500;">Phone</label>
+          <input [(ngModel)]="newSupplier.phone" type="text" style="width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px;">
+        </div>
+        <div>
+          <label style="display: block; margin-bottom: 8px; font-size: 14px; font-weight: 500;">GST Number</label>
+          <input [(ngModel)]="newSupplier.gstNumber" type="text" style="width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px;">
+        </div>
       </div>
-      <div>
-        <label style="display: block; margin-bottom: 8px; font-size: 14px; font-weight: 500;">Contact Person</label>
-        <input [(ngModel)]="newSupplier.contactPerson" type="text" style="width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px;">
-      </div>
-      <div>
-        <label style="display: block; margin-bottom: 8px; font-size: 14px; font-weight: 500;">Phone</label>
-        <input [(ngModel)]="newSupplier.phone" type="text" style="width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px;">
-      </div>
-      <div>
-        <label style="display: block; margin-bottom: 8px; font-size: 14px; font-weight: 500;">GST Number</label>
-        <input [(ngModel)]="newSupplier.gstNumber" type="text" style="width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px;">
-      </div>
+      <button (click)="saveSupplier()" style="background: #10b981; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: bold;">Save Supplier</button>
     </div>
-    <button (click)="saveSupplier()" style="background: #10b981; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: bold;">Save Supplier</button>
-  </div>
+  }
 
   <!-- Create PO Form -->
-  <div *ngIf="showPOForm()" style="background: white; padding: 24px; border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); margin-bottom: 24px; border: 1px solid #e5e7eb; border-left: 4px solid #059669;">
-    <h3 style="margin-top: 0; margin-bottom: 16px; font-size: 18px; font-weight: 600; color: #065f46;">New Purchase Order (Auto-Receives Stock)</h3>
-    
-    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px;">
-      <div>
-        <label style="display: block; margin-bottom: 8px; font-size: 14px; font-weight: 500;">Supplier *</label>
-        <select [(ngModel)]="poRequest.supplierId" style="width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; background: white;">
-          <option [ngValue]="0">-- Select Supplier --</option>
-          <option *ngFor="let s of suppliers()" [ngValue]="s.id">{{ s.name }}</option>
-        </select>
+  @if (showPOForm()) {
+    <div style="background: white; padding: 24px; border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); margin-bottom: 24px; border: 1px solid #e5e7eb; border-left: 4px solid #059669;">
+      <h3 style="margin-top: 0; margin-bottom: 16px; font-size: 18px; font-weight: 600; color: #065f46;">New Purchase Order (Auto-Receives Stock)</h3>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px;">
+        <div>
+          <label style="display: block; margin-bottom: 8px; font-size: 14px; font-weight: 500;">Supplier *</label>
+          <select [(ngModel)]="poRequest.supplierId" style="width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; background: white;">
+            <option [ngValue]="0">-- Select Supplier --</option>
+            @for (s of suppliers(); track s) {
+              <option [ngValue]="s.id">{{ s.name }}</option>
+            }
+          </select>
+        </div>
+        <div>
+          <label style="display: block; margin-bottom: 8px; font-size: 14px; font-weight: 500;">Receive into Warehouse *</label>
+          <select [(ngModel)]="poRequest.targetWarehouseId" style="width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; background: white;">
+            <option [ngValue]="0">-- Select Warehouse --</option>
+            @for (w of warehouses(); track w) {
+              <option [ngValue]="w.id">{{ w.name }}</option>
+            }
+          </select>
+        </div>
       </div>
-      <div>
-        <label style="display: block; margin-bottom: 8px; font-size: 14px; font-weight: 500;">Receive into Warehouse *</label>
-        <select [(ngModel)]="poRequest.targetWarehouseId" style="width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; background: white;">
-          <option [ngValue]="0">-- Select Warehouse --</option>
-          <option *ngFor="let w of warehouses()" [ngValue]="w.id">{{ w.name }}</option>
-        </select>
+      <h4 style="margin-top: 0; margin-bottom: 12px; font-size: 16px; font-weight: 600;">Items</h4>
+      <table style="width: 100%; border-collapse: collapse; margin-bottom: 16px;">
+        <thead>
+          <tr style="border-bottom: 2px solid #e5e7eb;">
+            <th style="padding: 8px; text-align: left; font-size: 12px; color: #6b7280;">Product</th>
+            <th style="padding: 8px; text-align: center; font-size: 12px; color: #6b7280;">Quantity</th>
+            <th style="padding: 8px; text-align: right; font-size: 12px; color: #6b7280;">Unit Price</th>
+            <th style="padding: 8px; text-align: right; font-size: 12px; color: #6b7280;">Tax %</th>
+            <th style="padding: 8px; text-align: right; font-size: 12px; color: #6b7280;">Line Total</th>
+            <th style="padding: 8px; text-align: center;"></th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (item of poRequest.items; track item; let i = $index) {
+            <tr style="border-bottom: 1px solid #f3f4f6;">
+              <td style="padding: 8px;">
+                <select [(ngModel)]="item.productId" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px;">
+                  <option [ngValue]="0">-- Select Product --</option>
+                  @for (p of products(); track p) {
+                    <option [ngValue]="p.id">{{ p.name }}</option>
+                  }
+                </select>
+              </td>
+              <td style="padding: 8px; text-align: center;">
+                <input [(ngModel)]="item.quantity" type="number" min="1" style="width: 60px; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; text-align: center;">
+              </td>
+              <td style="padding: 8px;">
+                <input [(ngModel)]="item.unitPrice" type="number" min="0" style="width: 100px; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; text-align: right;">
+              </td>
+              <td style="padding: 8px;">
+                <input [(ngModel)]="item.taxPercentage" type="number" min="0" style="width: 80px; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; text-align: right;">
+              </td>
+              <td style="padding: 8px; text-align: right; font-weight: 500;">
+                {{ (item.quantity * item.unitPrice) * (1 + (item.taxPercentage || 0) / 100) | currency:'INR' }}
+              </td>
+              <td style="padding: 8px; text-align: center;">
+                <button (click)="removePOItem(i)" style="background: #ef4444; color: white; border: none; padding: 6px 10px; border-radius: 4px; cursor: pointer;">X</button>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+      <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 24px;">
+        <button (click)="addPOItem()" style="background: #f3f4f6; color: #374151; border: 1px solid #d1d5db; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: bold;">+ Add Row</button>
+        <div style="text-align: right;">
+          <div style="font-size: 14px; color: #6b7280;">Subtotal: {{ calculateSubtotal() | currency:'INR' }}</div>
+          <div style="font-size: 14px; color: #ef4444;">Tax: {{ calculateTax() | currency:'INR' }}</div>
+          <div style="font-size: 20px; font-weight: bold; color: #111827;">Total: {{ calculateGrandTotal() | currency:'INR' }}</div>
+        </div>
       </div>
+      <button (click)="savePO()" style="background: #059669; color: white; border: none; padding: 12px 24px; border-radius: 6px; cursor: pointer; font-weight: bold; width: 100%;">Create PO & Receive Stock</button>
     </div>
-
-    <h4 style="margin-top: 0; margin-bottom: 12px; font-size: 16px; font-weight: 600;">Items</h4>
-    <table style="width: 100%; border-collapse: collapse; margin-bottom: 16px;">
-      <thead>
-        <tr style="border-bottom: 2px solid #e5e7eb;">
-          <th style="padding: 8px; text-align: left; font-size: 12px; color: #6b7280;">Product</th>
-          <th style="padding: 8px; text-align: center; font-size: 12px; color: #6b7280;">Quantity</th>
-          <th style="padding: 8px; text-align: right; font-size: 12px; color: #6b7280;">Unit Price</th>
-          <th style="padding: 8px; text-align: right; font-size: 12px; color: #6b7280;">Tax %</th>
-          <th style="padding: 8px; text-align: right; font-size: 12px; color: #6b7280;">Line Total</th>
-          <th style="padding: 8px; text-align: center;"></th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr *ngFor="let item of poRequest.items; let i = index" style="border-bottom: 1px solid #f3f4f6;">
-          <td style="padding: 8px;">
-            <select [(ngModel)]="item.productId" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px;">
-              <option [ngValue]="0">-- Select Product --</option>
-              <option *ngFor="let p of products()" [ngValue]="p.id">{{ p.name }}</option>
-            </select>
-          </td>
-          <td style="padding: 8px; text-align: center;">
-            <input [(ngModel)]="item.quantity" type="number" min="1" style="width: 60px; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; text-align: center;">
-          </td>
-          <td style="padding: 8px;">
-            <input [(ngModel)]="item.unitPrice" type="number" min="0" style="width: 100px; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; text-align: right;">
-          </td>
-          <td style="padding: 8px;">
-            <input [(ngModel)]="item.taxPercentage" type="number" min="0" style="width: 80px; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; text-align: right;">
-          </td>
-          <td style="padding: 8px; text-align: right; font-weight: 500;">
-            {{ (item.quantity * item.unitPrice) * (1 + (item.taxPercentage || 0) / 100) | currency:'INR' }}
-          </td>
-          <td style="padding: 8px; text-align: center;">
-            <button (click)="removePOItem(i)" style="background: #ef4444; color: white; border: none; padding: 6px 10px; border-radius: 4px; cursor: pointer;">X</button>
-          </td>
-        </tr>
-      </tbody>
-    </table>
-
-    <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 24px;">
-      <button (click)="addPOItem()" style="background: #f3f4f6; color: #374151; border: 1px solid #d1d5db; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: bold;">+ Add Row</button>
-      <div style="text-align: right;">
-        <div style="font-size: 14px; color: #6b7280;">Subtotal: {{ calculateSubtotal() | currency:'INR' }}</div>
-        <div style="font-size: 14px; color: #ef4444;">Tax: {{ calculateTax() | currency:'INR' }}</div>
-        <div style="font-size: 20px; font-weight: bold; color: #111827;">Total: {{ calculateGrandTotal() | currency:'INR' }}</div>
-      </div>
-    </div>
-
-    <button (click)="savePO()" style="background: #059669; color: white; border: none; padding: 12px 24px; border-radius: 6px; cursor: pointer; font-weight: bold; width: 100%;">Create PO & Receive Stock</button>
-  </div>
+  }
 
   <!-- Purchase Orders List -->
   <h3 style="margin-top: 32px; font-size: 18px; font-weight: 600; margin-bottom: 16px;">Recent Purchase Orders</h3>
@@ -124,20 +132,24 @@
         </tr>
       </thead>
       <tbody style="background-color: white;">
-        <tr *ngFor="let po of purchaseOrders()" style="border-bottom: 1px solid #e5e7eb; transition: background-color 0.2s;">
-          <td style="padding: 16px 24px; font-weight: bold; color: #2563eb;">{{ po.orderNumber }}</td>
-          <td style="padding: 16px 24px; color: #4b5563;">{{ po.orderDate }}</td>
-          <td style="padding: 16px 24px; font-weight: 500; color: #111827;">{{ po.supplier?.name }}</td>
-          <td style="padding: 16px 24px; font-weight: 500; color: #4b5563;">{{ po.totalAmount | currency:'INR' }}</td>
-          <td style="padding: 16px 24px; font-weight: 500; color: #ef4444;">{{ po.totalTax | currency:'INR' }}</td>
-          <td style="padding: 16px 24px; font-weight: bold; color: #059669;">{{ po.grandTotal | currency:'INR' }}</td>
-          <td style="padding: 16px 24px;"><span style="background: #d1fae5; color: #065f46; padding: 4px 8px; border-radius: 9999px; font-size: 12px; font-weight: bold;">{{ po.status }}</span></td>
-        </tr>
-        <tr *ngIf="purchaseOrders().length === 0">
-          <td colspan="7" style="padding: 32px 24px; text-align: center; color: #6b7280;">
-            No purchase orders created yet.
-          </td>
-        </tr>
+        @for (po of purchaseOrders(); track po) {
+          <tr style="border-bottom: 1px solid #e5e7eb; transition: background-color 0.2s;">
+            <td style="padding: 16px 24px; font-weight: bold; color: #2563eb;">{{ po.orderNumber }}</td>
+            <td style="padding: 16px 24px; color: #4b5563;">{{ po.orderDate }}</td>
+            <td style="padding: 16px 24px; font-weight: 500; color: #111827;">{{ po.supplier?.name }}</td>
+            <td style="padding: 16px 24px; font-weight: 500; color: #4b5563;">{{ po.totalAmount | currency:'INR' }}</td>
+            <td style="padding: 16px 24px; font-weight: 500; color: #ef4444;">{{ po.totalTax | currency:'INR' }}</td>
+            <td style="padding: 16px 24px; font-weight: bold; color: #059669;">{{ po.grandTotal | currency:'INR' }}</td>
+            <td style="padding: 16px 24px;"><span style="background: #d1fae5; color: #065f46; padding: 4px 8px; border-radius: 9999px; font-size: 12px; font-weight: bold;">{{ po.status }}</span></td>
+          </tr>
+        }
+        @if (purchaseOrders().length === 0) {
+          <tr>
+            <td colspan="7" style="padding: 32px 24px; text-align: center; color: #6b7280;">
+              No purchase orders created yet.
+            </td>
+          </tr>
+        }
       </tbody>
     </table>
   </div>

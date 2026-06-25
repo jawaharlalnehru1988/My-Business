@@ -1,5 +1,5 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { FormsModule } from '@angular/forms';
 import { InventoryService } from '../../services/inventory.service';
 import { ProductService } from '../../../product/services/product.service';
@@ -10,7 +10,7 @@ import { UsbScannerDirective } from '../../../../shared/directives/usb-scanner.d
 @Component({
   selector: 'app-inventory-dashboard',
   standalone: true,
-  imports: [CommonModule, FormsModule, UsbScannerDirective],
+  imports: [FormsModule, UsbScannerDirective],
   templateUrl: './inventory-dashboard.component.html'
 })
 export class InventoryDashboardComponent implements OnInit {

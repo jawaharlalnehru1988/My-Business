@@ -1,27 +1,29 @@
 <div style="min-height: 100vh; display: flex; align-items: center; justify-content: center; background-color: #f3f4f6; font-family: sans-serif;">
   <div style="background: white; padding: 40px; border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); width: 100%; max-width: 400px;">
     <h2 style="margin-top: 0; margin-bottom: 24px; font-size: 24px; font-weight: bold; color: #111827; text-align: center;">Sign In</h2>
-    
-    <div *ngIf="errorMessage()" style="background: #fee2e2; color: #b91c1c; padding: 12px; border-radius: 6px; margin-bottom: 16px; font-size: 14px; text-align: center;">
-      {{ errorMessage() }}
-    </div>
+
+    @if (errorMessage()) {
+      <div style="background: #fee2e2; color: #b91c1c; padding: 12px; border-radius: 6px; margin-bottom: 16px; font-size: 14px; text-align: center;">
+        {{ errorMessage() }}
+      </div>
+    }
 
     <form (ngSubmit)="login()">
       <div style="margin-bottom: 16px;">
         <label style="display: block; margin-bottom: 8px; font-size: 14px; font-weight: 500; color: #374151;">Email</label>
         <input [(ngModel)]="email" name="email" type="email" required style="width: 100%; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 6px; box-sizing: border-box;" placeholder="you@example.com">
       </div>
-      
+
       <div style="margin-bottom: 24px;">
         <label style="display: block; margin-bottom: 8px; font-size: 14px; font-weight: 500; color: #374151;">Password</label>
         <input [(ngModel)]="password" name="password" type="password" required style="width: 100%; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 6px; box-sizing: border-box;" placeholder="••••••••">
       </div>
-      
+
       <button type="submit" style="width: 100%; background: #3b82f6; color: white; border: none; padding: 12px; border-radius: 6px; font-size: 16px; font-weight: bold; cursor: pointer; transition: background-color 0.2s;">
         Sign In
       </button>
     </form>
-    
+
     <div style="margin-top: 24px; text-align: center; font-size: 14px; color: #4b5563;">
       Don't have an account? <a routerLink="/register" style="color: #3b82f6; text-decoration: none; font-weight: 500;">Register your business</a>
     </div>

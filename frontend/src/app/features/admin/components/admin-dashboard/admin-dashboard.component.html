@@ -2,41 +2,49 @@
   <h2 style="font-size: 24px; font-weight: bold; margin-bottom: 24px; color: #111827;">Super Admin Dashboard</h2>
   <p style="color: #4b5563; margin-bottom: 32px;">Overview of all registered businesses (Tenants).</p>
 
-  <div *ngIf="loading()" style="text-align: center; padding: 40px; color: #6b7280;">
-    Loading tenants...
-  </div>
+  @if (loading()) {
+    <div style="text-align: center; padding: 40px; color: #6b7280;">
+      Loading tenants...
+    </div>
+  }
 
-  <div *ngIf="!loading()" style="background: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border: 1px solid #e5e7eb; overflow: hidden;">
-    <table style="width: 100%; border-collapse: collapse; text-align: left;">
-      <thead style="background-color: #f9fafb; border-bottom: 1px solid #e5e7eb;">
-        <tr>
-          <th style="padding: 16px 24px; font-size: 12px; font-weight: 600; color: #6b7280; text-transform: uppercase;">ID</th>
-          <th style="padding: 16px 24px; font-size: 12px; font-weight: 600; color: #6b7280; text-transform: uppercase;">Business Name</th>
-          <th style="padding: 16px 24px; font-size: 12px; font-weight: 600; color: #6b7280; text-transform: uppercase;">GST Number</th>
-          <th style="padding: 16px 24px; font-size: 12px; font-weight: 600; color: #6b7280; text-transform: uppercase;">Contact Info</th>
-          <th style="padding: 16px 24px; font-size: 12px; font-weight: 600; color: #6b7280; text-transform: uppercase;">Created At</th>
-          <th style="padding: 16px 24px; font-size: 12px; font-weight: 600; color: #6b7280; text-transform: uppercase; text-align: right;">Actions</th>
-        </tr>
-      </thead>
-      <tbody style="background-color: white;">
-        <tr *ngFor="let t of tenants()" style="border-bottom: 1px solid #e5e7eb;">
-          <td style="padding: 16px 24px; color: #374151; font-weight: 500;">{{ t.id }}</td>
-          <td style="padding: 16px 24px; color: #111827; font-weight: bold;">{{ t.businessName }}</td>
-          <td style="padding: 16px 24px; color: #4b5563;">{{ t.gstNumber || 'N/A' }}</td>
-          <td style="padding: 16px 24px; color: #4b5563;">{{ t.contactInfo || 'N/A' }}</td>
-          <td style="padding: 16px 24px; color: #4b5563;">{{ t.createdAt | date }}</td>
-          <td style="padding: 16px 24px; text-align: right;">
-            <button (click)="viewBusiness(t.id)" style="background: #3b82f6; color: white; border: none; padding: 6px 12px; border-radius: 4px; font-size: 14px; font-weight: 500; cursor: pointer;">
-              View Business
-            </button>
-          </td>
-        </tr>
-        <tr *ngIf="tenants().length === 0">
-          <td colspan="5" style="padding: 32px 24px; text-align: center; color: #6b7280;">
-            No businesses registered yet.
-          </td>
-        </tr>
-      </tbody>
-    </table>
-  </div>
+  @if (!loading()) {
+    <div style="background: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border: 1px solid #e5e7eb; overflow: hidden;">
+      <table style="width: 100%; border-collapse: collapse; text-align: left;">
+        <thead style="background-color: #f9fafb; border-bottom: 1px solid #e5e7eb;">
+          <tr>
+            <th style="padding: 16px 24px; font-size: 12px; font-weight: 600; color: #6b7280; text-transform: uppercase;">ID</th>
+            <th style="padding: 16px 24px; font-size: 12px; font-weight: 600; color: #6b7280; text-transform: uppercase;">Business Name</th>
+            <th style="padding: 16px 24px; font-size: 12px; font-weight: 600; color: #6b7280; text-transform: uppercase;">GST Number</th>
+            <th style="padding: 16px 24px; font-size: 12px; font-weight: 600; color: #6b7280; text-transform: uppercase;">Contact Info</th>
+            <th style="padding: 16px 24px; font-size: 12px; font-weight: 600; color: #6b7280; text-transform: uppercase;">Created At</th>
+            <th style="padding: 16px 24px; font-size: 12px; font-weight: 600; color: #6b7280; text-transform: uppercase; text-align: right;">Actions</th>
+          </tr>
+        </thead>
+        <tbody style="background-color: white;">
+          @for (t of tenants(); track t) {
+            <tr style="border-bottom: 1px solid #e5e7eb;">
+              <td style="padding: 16px 24px; color: #374151; font-weight: 500;">{{ t.id }}</td>
+              <td style="padding: 16px 24px; color: #111827; font-weight: bold;">{{ t.businessName }}</td>
+              <td style="padding: 16px 24px; color: #4b5563;">{{ t.gstNumber || 'N/A' }}</td>
+              <td style="padding: 16px 24px; color: #4b5563;">{{ t.contactInfo || 'N/A' }}</td>
+              <td style="padding: 16px 24px; color: #4b5563;">{{ t.createdAt | date }}</td>
+              <td style="padding: 16px 24px; text-align: right;">
+                <button (click)="viewBusiness(t.id)" style="background: #3b82f6; color: white; border: none; padding: 6px 12px; border-radius: 4px; font-size: 14px; font-weight: 500; cursor: pointer;">
+                  View Business
+                </button>
+              </td>
+            </tr>
+          }
+          @if (tenants().length === 0) {
+            <tr>
+              <td colspan="5" style="padding: 32px 24px; text-align: center; color: #6b7280;">
+                No businesses registered yet.
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
 </div>

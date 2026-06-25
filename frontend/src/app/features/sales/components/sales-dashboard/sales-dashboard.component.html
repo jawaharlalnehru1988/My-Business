@@ -1,169 +1,169 @@
-<div appUsbScanner (onScan)="onBarcodeScanned($event)" style="padding: 24px; max-width: 1200px; margin: 0 auto; font-family: sans-serif;">
-  
-  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
-    <h2 style="font-size: 24px; font-weight: bold; margin: 0; color: #1a1a1a;">Sales & POS</h2>
-    <div>
-      <button (click)="toggleCustomerForm()" style="background: #e5e7eb; color: #374151; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: bold; margin-right: 12px;">
-        {{ showCustomerForm() ? 'Cancel' : '+ Add Customer' }}
-      </button>
-      <button (click)="togglePOSForm()" style="background: #3b82f6; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: bold;">
-        {{ showPOSForm() ? 'Cancel POS' : 'Open POS Terminal' }}
-      </button>
+
+
+<div class="vyapar-container" appUsbScanner (onScan)="onBarcodeScanned($event)">
+  <div class="vyapar-header">
+    <h2>Sale #1</h2>
+    <div class="toggle-container">
+      <span>Credit</span>
+      <div class="toggle-switch">
+        <div class="toggle-knob"></div>
+      </div>
+      <span>Cash</span>
     </div>
   </div>
 
-  <!-- Create Customer Form -->
-  <div *ngIf="showCustomerForm()" style="background: white; padding: 24px; border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); margin-bottom: 24px; border: 1px solid #e5e7eb;">
-    <h3 style="margin-top: 0; margin-bottom: 16px; font-size: 18px; font-weight: 600;">Add New Customer</h3>
-    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
-      <div>
-        <label style="display: block; margin-bottom: 8px; font-size: 14px; font-weight: 500;">Customer Name *</label>
-        <input [(ngModel)]="newCustomer.name" type="text" style="width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px;">
+  <div class="top-section">
+    <div class="search-box">
+      <div style="display: flex; gap: 16px;">
+        <div>
+          <input type="text" list="customersList" class="form-control" style="width: 250px;" placeholder="Search by Name/Phone *" [(ngModel)]="customerSearchText" (change)="onCustomerSelect($event)">
+          <datalist id="customersList">
+            @for (c of customers(); track c) {
+              <option [value]="c.name + ' - ' + c.phone"></option>
+            }
+          </datalist>
+        </div>
+
+        <div style="position: relative;">
+          <label style="position: absolute; top: -8px; left: 8px; background: #f3f4f6; padding: 0 4px; font-size: 11px; color: #3b82f6; font-weight: 500; z-index: 1;">Phone No.</label>
+          <input type="text" class="form-control" style="width: 150px; border-color: #3b82f6;" [(ngModel)]="customerPhoneText">
+        </div>
       </div>
-      <div>
-        <label style="display: block; margin-bottom: 8px; font-size: 14px; font-weight: 500;">Phone</label>
-        <input [(ngModel)]="newCustomer.phone" type="text" style="width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px;">
-      </div>
-      <div>
-        <label style="display: block; margin-bottom: 8px; font-size: 14px; font-weight: 500;">Email</label>
-        <input [(ngModel)]="newCustomer.email" type="text" style="width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px;">
-      </div>
-      <div>
-        <label style="display: block; margin-bottom: 8px; font-size: 14px; font-weight: 500;">GST Number</label>
-        <input [(ngModel)]="newCustomer.gstNumber" type="text" style="width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px;">
-      </div>
+
+      <select class="form-control" style="width: 250px;" [(ngModel)]="selectedWarehouseId">
+        <option [ngValue]="null">Select Warehouse *</option>
+        @for (w of warehouses(); track w) {
+          <option [ngValue]="w.id">{{ w.name }}</option>
+        }
+      </select>
     </div>
-    <button (click)="saveCustomer()" style="background: #10b981; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: bold;">Save Customer</button>
+
+    <div class="invoice-details">
+      <span>Invoice Number</span>
+      <input type="text" class="form-control" value="Auto-generated" readonly>
+
+      <span>Invoice Date</span>
+      <input type="date" class="form-control" [value]="saleOrders().length > 0 ? '' : ''">
+
+      <span>State of supply</span>
+      <select class="form-control" [(ngModel)]="taxType">
+        <option value="INTRA">Intra-State</option>
+        <option value="INTER">Inter-State</option>
+      </select>
+    </div>
   </div>
 
-  <!-- POS Terminal -->
-  <div *ngIf="showPOSForm()" style="background: white; padding: 24px; border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); margin-bottom: 24px; border: 1px solid #e5e7eb; border-top: 4px solid #3b82f6;">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
-      <h3 style="margin: 0; font-size: 20px; font-weight: bold; color: #1e40af;">Point of Sale (POS)</h3>
-      <span style="font-size: 14px; color: #6b7280;">Ready to scan barcode...</span>
-    </div>
-    
-    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px;">
-      <!-- Billing Info -->
-      <div style="background: #f9fafb; padding: 16px; border-radius: 8px; border: 1px solid #e5e7eb;">
-        <h4 style="margin-top: 0; margin-bottom: 12px; font-size: 14px; font-weight: 600; color: #374151;">Billing Info</h4>
-        <div style="margin-bottom: 12px;">
-          <label style="display: block; margin-bottom: 8px; font-size: 12px; font-weight: 500;">Customer (Optional)</label>
-          <select [(ngModel)]="selectedCustomerId" style="width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; background: white;">
-            <option [ngValue]="null">-- Walk-in Customer --</option>
-            <option *ngFor="let c of customers()" [ngValue]="c.id">{{ c.name }}</option>
-          </select>
-        </div>
-        <div>
-          <label style="display: block; margin-bottom: 8px; font-size: 12px; font-weight: 500;">Deduct Stock From Warehouse *</label>
-          <select [(ngModel)]="selectedWarehouseId" style="width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; background: white; margin-bottom: 12px;">
-            <option [ngValue]="null">-- Select Warehouse --</option>
-            <option *ngFor="let w of warehouses()" [ngValue]="w.id">{{ w.name }}</option>
-          </select>
-        </div>
-        <div>
-          <label style="display: block; margin-bottom: 8px; font-size: 12px; font-weight: 500;">Sale Type (GST) *</label>
-          <select [(ngModel)]="taxType" style="width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; background: white;">
-            <option value="INTRA">Intra-State (CGST + SGST)</option>
-            <option value="INTER">Inter-State (IGST)</option>
-          </select>
-        </div>
-      </div>
-
-      <!-- Add Product Manual -->
-      <div style="background: #f9fafb; padding: 16px; border-radius: 8px; border: 1px solid #e5e7eb;">
-        <h4 style="margin-top: 0; margin-bottom: 12px; font-size: 14px; font-weight: 600; color: #374151;">Manual Add Product</h4>
-        <div>
-          <label style="display: block; margin-bottom: 8px; font-size: 12px; font-weight: 500;">Search Product</label>
-          <select (change)="onProductSelected($event)" style="width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; background: white;">
-            <option value="">-- Select Product to Add --</option>
-            <option *ngFor="let p of products()" [value]="p.id">{{ p.name }} ({{p.sku}})</option>
-          </select>
-        </div>
-      </div>
-    </div>
-
-    <!-- Cart -->
-    <h4 style="margin-top: 0; margin-bottom: 12px; font-size: 16px; font-weight: 600;">Cart</h4>
-    <table style="width: 100%; border-collapse: collapse; margin-bottom: 24px;">
-      <thead style="background-color: #f3f4f6;">
+  <table class="items-table">
+    <thead>
+      <tr>
+        <th style="width: 40px; text-align: center;">#</th>
+        <th style="width: 25%;">ITEM</th>
+        <th style="width: 8%;">QTY</th>
+        <th style="width: 10%;">UNIT</th>
+        <th style="width: 12%;">PRICE/UNIT<br><span style="font-size:10px;font-weight:normal;">Without Tax</span></th>
+        <th style="width: 15%;">DISCOUNT<br><span style="font-size:10px;font-weight:normal;">% &nbsp;&nbsp;&nbsp; AMOUNT</span></th>
+        <th style="width: 15%;">TAX<br><span style="font-size:10px;font-weight:normal;">% &nbsp;&nbsp;&nbsp; AMOUNT</span></th>
+        <th style="width: 15%; text-align: right;">AMOUNT</th>
+        <th style="width: 40px;"></th>
+      </tr>
+    </thead>
+    <tbody>
+      @for (item of cart(); track item; let i = $index) {
         <tr>
-          <th style="padding: 12px; text-align: left; font-size: 12px; color: #4b5563;">Item</th>
-          <th style="padding: 12px; text-align: left; font-size: 12px; color: #4b5563;">Unit Price</th>
-          <th style="padding: 12px; text-align: left; font-size: 12px; color: #4b5563;">Qty</th>
-          <th style="padding: 12px; text-align: right; font-size: 12px; color: #4b5563;">Tax %</th>
-          <th style="padding: 12px; text-align: right; font-size: 12px; color: #4b5563;">Total</th>
-          <th style="padding: 12px; text-align: right; font-size: 12px; color: #4b5563;">Action</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr *ngFor="let item of cart(); let i = index" style="border-bottom: 1px solid #e5e7eb;">
-          <td style="padding: 12px; font-weight: 500;">{{ item.product.name }}</td>
-          <td style="padding: 12px;">
-            <input [(ngModel)]="item.unitPrice" type="number" style="width: 80px; padding: 4px; border: 1px solid #d1d5db; border-radius: 4px;">
+          <td style="text-align: center; color: #6b7280;">{{ i + 1 }}</td>
+          <td>
+            <select class="form-control" [ngModel]="item.productId" (ngModelChange)="onRowProductSelected(i, $event)">
+              <option [ngValue]="undefined"></option>
+              @for (p of products(); track p) {
+                <option [value]="p.id">{{ p.name }}</option>
+              }
+            </select>
           </td>
-          <td style="padding: 12px;">
-            <div style="display: flex; align-items: center; gap: 8px;">
-              <button (click)="updateQuantity(i, item.quantity - 1)" style="border: 1px solid #d1d5db; background: white; width: 24px; height: 24px; border-radius: 4px; cursor: pointer;">-</button>
-              <input [ngModel]="item.quantity" (ngModelChange)="updateQuantity(i, $event)" type="number" style="width: 50px; padding: 4px; border: 1px solid #d1d5db; border-radius: 4px; text-align: center;">
-              <button (click)="updateQuantity(i, item.quantity + 1)" style="border: 1px solid #d1d5db; background: white; width: 24px; height: 24px; border-radius: 4px; cursor: pointer;">+</button>
+          <td>
+            <input type="number" class="form-control" [ngModel]="item.quantity" (ngModelChange)="updateQuantity(i, $event)" min="1">
+          </td>
+          <td>
+            <select class="form-control" [(ngModel)]="item.unit">
+              <option value="NONE">NONE</option>
+              <option value="BAG">BAGS (BAG)</option>
+              <option value="BTL">BOTTLES (BTL)</option>
+              <option value="BOX">BOX (BOX)</option>
+              <option value="BDL">BUNDLES (BDL)</option>
+            </select>
+          </td>
+          <td>
+            <input type="number" class="form-control" [(ngModel)]="item.unitPrice">
+          </td>
+          <td>
+            <div class="cell-flex">
+              <input type="number" class="form-control" [(ngModel)]="item.discountPercentage" style="width: 40%;" placeholder="%">
+              <input type="number" class="form-control" [(ngModel)]="item.discountAmount" style="width: 60%;" placeholder="Amt">
             </div>
           </td>
-          <td style="padding: 12px; text-align: right; color: #ef4444;">{{ taxType() === 'INTER' ? item.igstPercentage : (item.cgstPercentage + item.sgstPercentage) }}%</td>
-          <td style="padding: 12px; text-align: right; font-weight: bold;">{{ (item.quantity * item.unitPrice) + (item.quantity * item.unitPrice * ((taxType() === 'INTER' ? item.igstPercentage : (item.cgstPercentage + item.sgstPercentage))/100)) | currency:'INR' }}</td>
-          <td style="padding: 12px; text-align: right;">
-            <button (click)="removeFromCart(i)" style="background: none; border: none; color: #ef4444; cursor: pointer; font-size: 16px;">&times;</button>
+          <td>
+            <div class="cell-flex">
+              <select class="form-control" style="width: 55%; font-size: 11px; padding: 4px;" [ngModel]="item.selectedTax" (ngModelChange)="onTaxChange(i, $event)">
+                <option value="NONE">NONE</option>
+                <optgroup label="IGST">
+                  <option value="IGST-0">IGST&#64;0%</option>
+                  <option value="IGST-0.25">IGST&#64;0.25%</option>
+                  <option value="IGST-3">IGST&#64;3%</option>
+                  <option value="IGST-5">IGST&#64;5%</option>
+                  <option value="IGST-12">IGST&#64;12%</option>
+                  <option value="IGST-18">IGST&#64;18%</option>
+                  <option value="IGST-28">IGST&#64;28%</option>
+                </optgroup>
+                <optgroup label="GST">
+                  <option value="GST-0">GST&#64;0%</option>
+                  <option value="GST-0.25">GST&#64;0.25%</option>
+                  <option value="GST-3">GST&#64;3%</option>
+                  <option value="GST-5">GST&#64;5%</option>
+                  <option value="GST-12">GST&#64;12%</option>
+                  <option value="GST-18">GST&#64;18%</option>
+                  <option value="GST-28">GST&#64;28%</option>
+                </optgroup>
+              </select>
+              <div style="width: 45%; font-size: 12px; text-align: right;">
+                {{ getTaxAmount(i) | number:'1.2-2' }}
+              </div>
+            </div>
+          </td>
+          <td style="text-align: right; font-weight: 500;">
+            {{ (item.quantity * item.unitPrice) - item.discountAmount + (((item.quantity * item.unitPrice) - item.discountAmount) * ((taxType() === 'INTER' ? item.igstPercentage : (item.cgstPercentage + item.sgstPercentage))/100)) | number:'1.2-2' }}
+          </td>
+          <td style="text-align: center;">
+            <button class="delete-icon" (click)="removeFromCart(i)" title="Remove Item">&times;</button>
           </td>
         </tr>
-        <tr *ngIf="cart().length === 0">
-          <td colspan="5" style="padding: 24px; text-align: center; color: #9ca3af; font-style: italic;">Cart is empty. Scan barcode or add manually.</td>
-        </tr>
-      </tbody>
-    </table>
+      }
+    </tbody>
+  </table>
 
-    <div style="display: flex; justify-content: flex-end; align-items: center; gap: 24px; margin-top: 16px; padding-top: 16px; border-top: 2px dashed #e5e7eb;">
-      <div style="text-align: right; line-height: 1.5;">
-        <div style="font-size: 14px; color: #6b7280;">Sub Total: {{ totalAmount() | currency:'INR' }}</div>
-        <div style="font-size: 14px; color: #ef4444;">Tax Amount: {{ totalTax() | currency:'INR' }}</div>
-        <div style="font-size: 24px; font-weight: bold; color: #111827; margin-top: 4px;">
-          Grand Total: <span style="color: #3b82f6;">{{ grandTotal() | currency:'INR' }}</span>
-        </div>
+  <button class="add-row-btn" (click)="addRow()">ADD ROW</button>
+
+  <div class="footer-section">
+    <div class="terms-box">
+      <div class="terms-header">Terms & Conditions</div>
+      <div class="terms-content">
+        Thank you for doing business with us.
       </div>
-      <button (click)="completeSale()" style="background: #3b82f6; color: white; border: none; padding: 16px 32px; border-radius: 8px; cursor: pointer; font-size: 18px; font-weight: bold; box-shadow: 0 4px 6px rgba(59, 130, 246, 0.3);">
-        Generate Invoice & Pay
-      </button>
+    </div>
+
+    <div class="action-buttons">
+      <button class="action-btn">📄 ADD DESCRIPTION</button>
+      <button class="action-btn">📷 ADD IMAGE</button>
+      <button class="action-btn">📎 ADD DOCUMENT</button>
+    </div>
+
+    <div class="totals-box">
+      <span>Total</span>
+      <div class="amount-input">{{ grandTotal() | number:'1.2-2' }}</div>
     </div>
   </div>
 
-  <!-- Sale Orders List -->
-  <h3 style="margin-top: 32px; font-size: 18px; font-weight: 600; margin-bottom: 16px;">Recent Sales / Invoices</h3>
-  <div style="background: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); overflow: hidden; border: 1px solid #e5e7eb;">
-    <table style="width: 100%; border-collapse: collapse; text-align: left;">
-      <thead style="background-color: #f9fafb; border-bottom: 1px solid #e5e7eb;">
-        <tr>
-          <th style="padding: 12px 24px; font-size: 12px; font-weight: 600; color: #6b7280; text-transform: uppercase;">INV #</th>
-          <th style="padding: 12px 24px; font-size: 12px; font-weight: 600; color: #6b7280; text-transform: uppercase;">Date</th>
-          <th style="padding: 12px 24px; font-size: 12px; font-weight: 600; color: #6b7280; text-transform: uppercase;">Customer</th>
-          <th style="padding: 12px 24px; font-size: 12px; font-weight: 600; color: #6b7280; text-transform: uppercase;">Amount (ex Tax)</th>
-          <th style="padding: 12px 24px; font-size: 12px; font-weight: 600; color: #6b7280; text-transform: uppercase;">Tax</th>
-          <th style="padding: 12px 24px; font-size: 12px; font-weight: 600; color: #6b7280; text-transform: uppercase;">Grand Total</th>
-        </tr>
-      </thead>
-      <tbody style="background-color: white;">
-        <tr *ngFor="let s of saleOrders()" style="border-bottom: 1px solid #e5e7eb; transition: background-color 0.2s;">
-          <td style="padding: 16px 24px; font-weight: bold; color: #3b82f6;">{{ s.invoiceNumber }}</td>
-          <td style="padding: 16px 24px; color: #4b5563;">{{ s.saleDate }}</td>
-          <td style="padding: 16px 24px; font-weight: 500; color: #111827;">{{ s.customer?.name || 'Walk-in' }}</td>
-          <td style="padding: 16px 24px; font-weight: 500; color: #4b5563;">{{ s.totalAmount | currency:'INR' }}</td>
-          <td style="padding: 16px 24px; font-weight: 500; color: #ef4444;">{{ s.totalTax | currency:'INR' }}</td>
-          <td style="padding: 16px 24px; font-weight: bold; color: #059669;">{{ s.grandTotal | currency:'INR' }}</td>
-        </tr>
-        <tr *ngIf="saleOrders().length === 0">
-          <td colspan="4" style="padding: 32px 24px; text-align: center; color: #6b7280;">
-            No sales recorded yet.
-          </td>
-        </tr>
-      </tbody>
-    </table>
+  <div class="bottom-bar">
+    <button class="btn-share">Share</button>
+    <button class="btn-save" (click)="completeSale()">Save</button>
   </div>
 </div>
+

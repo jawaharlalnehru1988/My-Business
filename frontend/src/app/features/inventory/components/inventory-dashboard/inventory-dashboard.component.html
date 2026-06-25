@@ -1,5 +1,5 @@
 <div appUsbScanner (onScan)="onBarcodeScanned($event)" style="padding: 24px; max-width: 1200px; margin: 0 auto; font-family: sans-serif;">
-  
+
   <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
     <h2 style="font-size: 24px; font-weight: bold; margin: 0; color: #1a1a1a;">Inventory Dashboard</h2>
     <div>
@@ -13,64 +13,69 @@
   </div>
 
   <!-- Create Warehouse Form -->
-  <div *ngIf="showWarehouseForm()" style="background: white; padding: 24px; border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); margin-bottom: 24px; border: 1px solid #e5e7eb;">
-    <h3 style="margin-top: 0; margin-bottom: 16px; font-size: 18px; font-weight: 600;">Create Warehouse</h3>
-    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
-      <div>
-        <label style="display: block; margin-bottom: 8px; font-size: 14px; font-weight: 500;">Warehouse Name *</label>
-        <input [(ngModel)]="newWarehouse.name" type="text" style="width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px;">
-      </div>
-      <div>
-        <label style="display: block; margin-bottom: 8px; font-size: 14px; font-weight: 500;">Location</label>
-        <input [(ngModel)]="newWarehouse.location" type="text" style="width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px;">
-      </div>
-    </div>
-    <button (click)="saveWarehouse()" style="background: #10b981; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: bold;">Save Warehouse</button>
-  </div>
-
-  <!-- Adjust Stock Form -->
-  <div *ngIf="showAdjustForm()" style="background: white; padding: 24px; border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); margin-bottom: 24px; border: 1px solid #e5e7eb; border-left: 4px solid #f59e0b;">
-    <h3 style="margin-top: 0; margin-bottom: 16px; font-size: 18px; font-weight: 600; color: #b45309;">Manual Stock Adjustment</h3>
-    
-    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 16px;">
-      <div>
-        <label style="display: block; margin-bottom: 8px; font-size: 14px; font-weight: 500;">Select Product *</label>
-        <select [(ngModel)]="selectedProductId" (change)="onSelectionChange()" style="width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; background: white;">
-          <option [ngValue]="null">-- Select Product --</option>
-          <option *ngFor="let p of products()" [ngValue]="p.id">{{ p.name }} ({{p.sku}})</option>
-        </select>
-      </div>
-      <div>
-        <label style="display: block; margin-bottom: 8px; font-size: 14px; font-weight: 500;">Select Warehouse *</label>
-        <select [(ngModel)]="selectedWarehouseId" (change)="onSelectionChange()" style="width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; background: white;">
-          <option [ngValue]="null">-- Select Warehouse --</option>
-          <option *ngFor="let w of warehouses()" [ngValue]="w.id">{{ w.name }}</option>
-        </select>
-      </div>
-      <div>
-        <label style="display: block; margin-bottom: 8px; font-size: 14px; font-weight: 500;">Current Balance</label>
-        <div style="padding: 8px 12px; background: #f3f4f6; border-radius: 6px; font-weight: bold;">
-          {{ currentBalance() !== null ? currentBalance() : 'N/A' }}
+  @if (showWarehouseForm()) {
+    <div style="background: white; padding: 24px; border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); margin-bottom: 24px; border: 1px solid #e5e7eb;">
+      <h3 style="margin-top: 0; margin-bottom: 16px; font-size: 18px; font-weight: 600;">Create Warehouse</h3>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
+        <div>
+          <label style="display: block; margin-bottom: 8px; font-size: 14px; font-weight: 500;">Warehouse Name *</label>
+          <input [(ngModel)]="newWarehouse.name" type="text" style="width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px;">
+        </div>
+        <div>
+          <label style="display: block; margin-bottom: 8px; font-size: 14px; font-weight: 500;">Location</label>
+          <input [(ngModel)]="newWarehouse.location" type="text" style="width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px;">
         </div>
       </div>
+      <button (click)="saveWarehouse()" style="background: #10b981; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: bold;">Save Warehouse</button>
     </div>
+  }
 
-    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
-       <div>
-        <label style="display: block; margin-bottom: 8px; font-size: 14px; font-weight: 500;">Adjustment Type</label>
-        <select [(ngModel)]="adjustType" style="width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; background: white;">
-          <option value="IN">Stock IN (+)</option>
-          <option value="OUT">Stock OUT (-)</option>
-        </select>
+  <!-- Adjust Stock Form -->
+  @if (showAdjustForm()) {
+    <div style="background: white; padding: 24px; border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); margin-bottom: 24px; border: 1px solid #e5e7eb; border-left: 4px solid #f59e0b;">
+      <h3 style="margin-top: 0; margin-bottom: 16px; font-size: 18px; font-weight: 600; color: #b45309;">Manual Stock Adjustment</h3>
+      <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 16px;">
+        <div>
+          <label style="display: block; margin-bottom: 8px; font-size: 14px; font-weight: 500;">Select Product *</label>
+          <select [(ngModel)]="selectedProductId" (change)="onSelectionChange()" style="width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; background: white;">
+            <option [ngValue]="null">-- Select Product --</option>
+            @for (p of products(); track p) {
+              <option [ngValue]="p.id">{{ p.name }} ({{p.sku}})</option>
+            }
+          </select>
+        </div>
+        <div>
+          <label style="display: block; margin-bottom: 8px; font-size: 14px; font-weight: 500;">Select Warehouse *</label>
+          <select [(ngModel)]="selectedWarehouseId" (change)="onSelectionChange()" style="width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; background: white;">
+            <option [ngValue]="null">-- Select Warehouse --</option>
+            @for (w of warehouses(); track w) {
+              <option [ngValue]="w.id">{{ w.name }}</option>
+            }
+          </select>
+        </div>
+        <div>
+          <label style="display: block; margin-bottom: 8px; font-size: 14px; font-weight: 500;">Current Balance</label>
+          <div style="padding: 8px 12px; background: #f3f4f6; border-radius: 6px; font-weight: bold;">
+            {{ currentBalance() !== null ? currentBalance() : 'N/A' }}
+          </div>
+        </div>
       </div>
-      <div>
-        <label style="display: block; margin-bottom: 8px; font-size: 14px; font-weight: 500;">Quantity *</label>
-        <input [(ngModel)]="adjustQuantity" type="number" min="1" style="width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px;">
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
+        <div>
+          <label style="display: block; margin-bottom: 8px; font-size: 14px; font-weight: 500;">Adjustment Type</label>
+          <select [(ngModel)]="adjustType" style="width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; background: white;">
+            <option value="IN">Stock IN (+)</option>
+            <option value="OUT">Stock OUT (-)</option>
+          </select>
+        </div>
+        <div>
+          <label style="display: block; margin-bottom: 8px; font-size: 14px; font-weight: 500;">Quantity *</label>
+          <input [(ngModel)]="adjustQuantity" type="number" min="1" style="width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px;">
+        </div>
       </div>
+      <button (click)="adjustStock()" style="background: #f59e0b; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: bold;">Confirm Adjustment</button>
     </div>
-
-    <button (click)="adjustStock()" style="background: #f59e0b; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: bold;">Confirm Adjustment</button>
-  </div>
+  }
 
   <!-- Warehouses List -->
   <div style="background: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); overflow: hidden; border: 1px solid #e5e7eb;">
@@ -83,16 +88,20 @@
         </tr>
       </thead>
       <tbody style="background-color: white;">
-        <tr *ngFor="let w of warehouses()" style="border-bottom: 1px solid #e5e7eb; transition: background-color 0.2s;">
-          <td style="padding: 16px 24px; color: #374151;">{{ w.id }}</td>
-          <td style="padding: 16px 24px; font-weight: 500; color: #111827;">{{ w.name }}</td>
-          <td style="padding: 16px 24px; color: #4b5563;">{{ w.location || 'N/A' }}</td>
-        </tr>
-        <tr *ngIf="warehouses().length === 0">
-          <td colspan="3" style="padding: 32px 24px; text-align: center; color: #6b7280;">
-            No warehouses configured. Click '+ New Warehouse' to get started.
-          </td>
-        </tr>
+        @for (w of warehouses(); track w) {
+          <tr style="border-bottom: 1px solid #e5e7eb; transition: background-color 0.2s;">
+            <td style="padding: 16px 24px; color: #374151;">{{ w.id }}</td>
+            <td style="padding: 16px 24px; font-weight: 500; color: #111827;">{{ w.name }}</td>
+            <td style="padding: 16px 24px; color: #4b5563;">{{ w.location || 'N/A' }}</td>
+          </tr>
+        }
+        @if (warehouses().length === 0) {
+          <tr>
+            <td colspan="3" style="padding: 32px 24px; text-align: center; color: #6b7280;">
+              No warehouses configured. Click '+ New Warehouse' to get started.
+            </td>
+          </tr>
+        }
       </tbody>
     </table>
   </div>

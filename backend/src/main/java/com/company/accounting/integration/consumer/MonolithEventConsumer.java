@@ -40,7 +40,7 @@ public class MonolithEventConsumer {
                     log.info("Compensated Purchase Order: {}", ref);
                 });
             } else if (ref != null && ref.startsWith("SO-")) {
-                Optional<SaleOrder> soOpt = saleOrderRepository.findByOrderNumber(ref);
+                Optional<SaleOrder> soOpt = saleOrderRepository.findByInvoiceNumber(ref);
                 soOpt.ifPresent(so -> {
                     so.setStatus("FAILED_ACCOUNTING");
                     saleOrderRepository.save(so);

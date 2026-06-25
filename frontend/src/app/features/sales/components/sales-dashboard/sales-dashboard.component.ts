@@ -14,19 +14,25 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
 interface POSItem {
-  product: Product;
+  product?: Product;
+  productId?: number;
   quantity: number;
+  unit: string;
   unitPrice: number;
+  discountPercentage: number;
+  discountAmount: number;
   cgstPercentage: number;
   sgstPercentage: number;
   igstPercentage: number;
+  selectedTax: string;
 }
 
 @Component({
   selector: 'app-sales-dashboard',
   standalone: true,
   imports: [CommonModule, FormsModule, UsbScannerDirective],
-  templateUrl: './sales-dashboard.component.html'
+  templateUrl: './sales-dashboard.component.html',
+  styleUrl: './sales-dashboard.component.scss'
 })
 export class SalesDashboardComponent implements OnInit {
   private salesService = inject(SalesService);
@@ -46,21 +52,23 @@ export class SalesDashboardComponent implements OnInit {
   newCustomer: Customer = { name: '', phone: '', email: '', gstNumber: '' };
 
   // POS State
-  showPOSForm = signal<boolean>(false);
+  showPOSForm = signal<boolean>(true); // default to true to show the vyapar interface
   selectedCustomerId = signal<number | null>(null);
   selectedWarehouseId = signal<number | null>(null);
+  customerSearchText = '';
+  customerPhoneText = '';
   cart = signal<POSItem[]>([]);
   taxType = signal<'INTRA' | 'INTER'>('INTRA');
   
   totalAmount = computed(() => {
-    return this.cart().reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
+    return this.cart().reduce((sum, item) => sum + (item.quantity * item.unitPrice) - item.discountAmount, 0);
   });
 
   totalTax = computed(() => {
-    const isInter = this.taxType() === 'INTER';
     return this.cart().reduce((sum, item) => {
-      const subTotal = item.quantity * item.unitPrice;
-      const taxPct = isInter ? item.igstPercentage : (item.cgstPercentage + item.sgstPercentage);
+      if (!item.product) return sum;
+      const subTotal = (item.quantity * item.unitPrice) - item.discountAmount;
+      const taxPct = item.cgstPercentage + item.sgstPercentage + item.igstPercentage;
       const tax = subTotal * (taxPct / 100);
       return sum + tax;
     }, 0);
@@ -72,6 +80,8 @@ export class SalesDashboardComponent implements OnInit {
 
   ngOnInit() {
     this.loadData();
+    // Add one empty row initially
+    this.addRow();
   }
 
   loadData() {
@@ -107,6 +117,19 @@ export class SalesDashboardComponent implements OnInit {
     if (this.showPOSForm()) {
       this.cart.set([]);
       this.selectedCustomerId.set(null);
+      this.customerSearchText = '';
+      this.customerPhoneText = '';
+    }
+  }
+
+  onCustomerSelect(event: any) {
+    const val = event.target.value;
+    const customer = this.customers().find(c => (c.name + ' - ' + c.phone) === val || c.name === val || c.phone === val);
+    if (customer) {
+      this.selectedCustomerId.set(customer.id!);
+      this.customerPhoneText = customer.phone || '';
+    } else {
+      this.selectedCustomerId.set(null);
     }
   }
 
@@ -136,9 +159,84 @@ export class SalesDashboardComponent implements OnInit {
     }
   }
 
+  addRow() {
+    const currentCart = this.cart();
+    this.cart.set([...currentCart, {
+      quantity: 0,
+      unit: 'NONE',
+      unitPrice: 0,
+      discountPercentage: 0,
+      discountAmount: 0,
+      cgstPercentage: 0,
+      sgstPercentage: 0,
+      igstPercentage: 0,
+      selectedTax: 'NONE'
+    }]);
+  }
+
+  onTaxChange(index: number, taxValue: string) {
+    const currentCart = this.cart();
+    let cgst = 0, sgst = 0, igst = 0;
+    if (taxValue.startsWith('GST')) {
+      const val = parseFloat(taxValue.split('-')[1]);
+      cgst = val / 2;
+      sgst = val / 2;
+    } else if (taxValue.startsWith('IGST')) {
+      const val = parseFloat(taxValue.split('-')[1]);
+      igst = val;
+    }
+    
+    currentCart[index].selectedTax = taxValue;
+    currentCart[index].cgstPercentage = cgst;
+    currentCart[index].sgstPercentage = sgst;
+    currentCart[index].igstPercentage = igst;
+    this.cart.set([...currentCart]);
+  }
+
+  getTaxAmount(index: number): number {
+    const item = this.cart()[index];
+    const subTotal = (item.quantity * item.unitPrice) - item.discountAmount;
+    const taxPct = item.cgstPercentage + item.sgstPercentage + item.igstPercentage;
+    return subTotal * (taxPct / 100);
+  }
+
+  onRowProductSelected(index: number, productId: any) {
+    const currentCart = this.cart();
+    const product = this.products().find(p => p.id === Number(productId));
+    if (product) {
+      let isInter = this.taxType() === 'INTER';
+      let selectedTax = 'NONE';
+      if (product.cgstPercentage || product.igstPercentage) {
+         if (isInter) {
+           selectedTax = `IGST-${product.igstPercentage || 0}`;
+         } else {
+           selectedTax = `GST-${(product.cgstPercentage || 0) + (product.sgstPercentage || 0)}`;
+         }
+      }
+
+      currentCart[index] = {
+        ...currentCart[index],
+        product: product,
+        productId: product.id,
+        quantity: 1,
+        unit: 'NONE',
+        unitPrice: product.basePrice,
+        cgstPercentage: isInter ? 0 : (product.cgstPercentage || 0),
+        sgstPercentage: isInter ? 0 : (product.sgstPercentage || 0),
+        igstPercentage: isInter ? (product.igstPercentage || 0) : 0,
+        selectedTax: selectedTax
+      };
+      this.cart.set([...currentCart]);
+      // Auto-add next row if this was the last row
+      if (index === currentCart.length - 1) {
+        this.addRow();
+      }
+    }
+  }
+
   addToCart(product: Product) {
     const currentCart = this.cart();
-    const existing = currentCart.find(i => i.product.id === product.id);
+    const existing = currentCart.find(i => i.product?.id === product.id);
     
     if (existing) {
       existing.quantity += 1;
@@ -147,7 +245,25 @@ export class SalesDashboardComponent implements OnInit {
       const cgst = product.cgstPercentage || 0;
       const sgst = product.sgstPercentage || 0;
       const igst = product.igstPercentage || 0;
-      this.cart.set([...currentCart, { product, quantity: 1, unitPrice: product.basePrice, cgstPercentage: cgst, sgstPercentage: sgst, igstPercentage: igst }]);
+      // If there's an empty row, replace it instead of pushing
+      const emptyRowIndex = currentCart.findIndex(i => !i.product);
+      
+      let isInter = this.taxType() === 'INTER';
+      let selectedTax = 'NONE';
+      if (cgst || igst) {
+         selectedTax = isInter ? `IGST-${igst}` : `GST-${cgst + sgst}`;
+      }
+      
+      const newItem: POSItem = { product, productId: product.id, quantity: 1, unit: 'NONE', unitPrice: product.basePrice, discountPercentage: 0, discountAmount: 0, cgstPercentage: isInter ? 0 : cgst, sgstPercentage: isInter ? 0 : sgst, igstPercentage: isInter ? igst : 0, selectedTax: selectedTax };
+
+      if (emptyRowIndex !== -1) {
+        currentCart[emptyRowIndex] = newItem;
+        this.cart.set([...currentCart]);
+        if (emptyRowIndex === currentCart.length - 1) this.addRow();
+      } else {
+        this.cart.set([...currentCart, newItem]);
+        this.addRow();
+      }
     }
   }
 
@@ -172,16 +288,19 @@ export class SalesDashboardComponent implements OnInit {
       alert("Please select a Source Warehouse to deduct stock from.");
       return;
     }
-    if (this.cart().length === 0) {
-      alert("Cart is empty.");
+    
+    const validItems = this.cart().filter(i => i.product && i.quantity > 0);
+    
+    if (validItems.length === 0) {
+      alert("Cart is empty or no valid items selected.");
       return;
     }
 
     const request: SaleOrderCreateRequest = {
       customerId: this.selectedCustomerId(),
       sourceWarehouseId: this.selectedWarehouseId()!,
-      items: this.cart().map(item => ({
-        productId: item.product.id!,
+      items: validItems.map(item => ({
+        productId: item.product!.id!,
         quantity: item.quantity,
         unitPrice: item.unitPrice
       }))
@@ -216,13 +335,14 @@ export class SalesDashboardComponent implements OnInit {
         let totalSgst = 0;
         let totalIgst = 0;
 
-        this.cart().forEach((item, index) => {
-          const sub = item.quantity * item.unitPrice;
+        const validItems = this.cart().filter(i => i.product && i.quantity > 0);
+        validItems.forEach((item, index) => {
+          const sub = (item.quantity * item.unitPrice) - item.discountAmount;
           let tax = 0;
           let row = [
             (index + 1).toString(),
-            item.product.name,
-            item.product.hsnSac || '-',
+            item.product!.name,
+            item.product!.hsnSac || '-',
             item.quantity.toString(),
             `Rs. ${item.unitPrice.toFixed(2)}`
           ];
