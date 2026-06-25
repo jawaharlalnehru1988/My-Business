@@ -40,11 +40,7 @@ public class SalesController {
     }
 
     @PostMapping("/orders")
-    public ResponseEntity<?> createSaleOrder(@RequestBody SaleOrderCreateRequest request) {
-        try {
-            return ResponseEntity.ok(saleOrderService.createAndCompleteSaleOrder(request));
-        } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().body(e.getMessage());
-        }
+    public ResponseEntity<SaleOrder> createSaleOrder(@RequestBody SaleOrderCreateRequest request) {
+        return ResponseEntity.ok(saleOrderService.createSaleOrder(request));
     }
 }

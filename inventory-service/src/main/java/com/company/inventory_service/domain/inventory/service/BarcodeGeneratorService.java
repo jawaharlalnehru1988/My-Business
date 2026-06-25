@@ -1,4 +1,4 @@
-package com.company.accounting.domain.inventory.service;
+package com.company.inventory_service.domain.inventory.service;
 
 import com.google.zxing.BarcodeFormat;
 import com.google.zxing.client.j2se.MatrixToImageWriter;
@@ -25,3 +25,5 @@ public class BarcodeGeneratorService {
         return "data:image/png;base64," + Base64.getEncoder().encodeToString(outputStream.toByteArray());
     }
 }
+
+

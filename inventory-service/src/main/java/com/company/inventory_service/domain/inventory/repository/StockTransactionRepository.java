@@ -1,6 +1,6 @@
-package com.company.accounting.domain.inventory.repository;
+package com.company.inventory_service.domain.inventory.repository;
 
-import com.company.accounting.domain.inventory.entity.StockTransaction;
+import com.company.inventory_service.domain.inventory.entity.StockTransaction;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -12,6 +12,8 @@ public interface StockTransactionRepository extends JpaRepository<StockTransacti
     
     List<StockTransaction> findByProductId(Long productId);
 
-    @Query("SELECT COALESCE(SUM(st.quantity), 0) FROM StockTransaction st WHERE st.product.id = :productId AND st.warehouse.id = :warehouseId")
+    @Query("SELECT COALESCE(SUM(st.quantity), 0) FROM StockTransaction st WHERE st.productId = :productId AND st.warehouse.id = :warehouseId")
     BigDecimal calculateStockBalance(@Param("productId") Long productId, @Param("warehouseId") Long warehouseId);
 }
+
+

@@ -1,8 +1,8 @@
-package com.company.accounting.domain.inventory.controller;
+package com.company.inventory_service.domain.inventory.controller;
 
-import com.company.accounting.domain.inventory.entity.StockTransaction;
-import com.company.accounting.domain.inventory.entity.Warehouse;
-import com.company.accounting.domain.inventory.service.InventoryService;
+import com.company.inventory_service.domain.inventory.entity.StockTransaction;
+import com.company.inventory_service.domain.inventory.entity.Warehouse;
+import com.company.inventory_service.domain.inventory.service.InventoryService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -10,7 +10,7 @@ import org.springframework.web.bind.annotation.*;
 import java.math.BigDecimal;
 import java.util.List;
 
-import com.company.accounting.core.tenant.TenantContext;
+import com.company.inventory_service.core.tenant.TenantContext;
 
 @RestController
 @RequestMapping("/api/v1/inventory")
@@ -48,3 +48,5 @@ public class InventoryController {
         return ResponseEntity.ok(inventoryService.getStockBalance(productId, warehouseId));
     }
 }
+
+

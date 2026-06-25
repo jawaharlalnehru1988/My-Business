@@ -1,6 +1,5 @@
-package com.company.accounting.domain.inventory.entity;
+package com.company.inventory_service.domain.inventory.entity;
 
-import com.company.accounting.domain.product.entity.Product;
 import jakarta.persistence.*;
 import lombok.*;
 import java.math.BigDecimal;
@@ -19,9 +18,8 @@ public class StockTransaction {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "product_id", nullable = false)
-    private Product product;
+    @Column(name = "product_id", nullable = false)
+    private Long productId;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "warehouse_id", nullable = false)
@@ -36,3 +34,5 @@ public class StockTransaction {
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 }
+
+

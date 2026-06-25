@@ -1,4 +1,4 @@
-package com.company.accounting.domain.inventory.entity;
+package com.company.inventory_service.domain.inventory.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
@@ -24,3 +24,5 @@ public class Warehouse {
     @Column(name = "tenant_id", nullable = false)
     private Long tenantId;
 }
+
+

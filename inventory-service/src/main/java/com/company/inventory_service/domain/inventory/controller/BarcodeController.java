@@ -1,6 +1,6 @@
-package com.company.accounting.domain.inventory.controller;
+package com.company.inventory_service.domain.inventory.controller;
 
-import com.company.accounting.domain.inventory.service.BarcodeGeneratorService;
+import com.company.inventory_service.domain.inventory.service.BarcodeGeneratorService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -29,3 +29,5 @@ public class BarcodeController {
         }
     }
 }
+
+

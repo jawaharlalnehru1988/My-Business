@@ -1,6 +1,7 @@
 package com.company.accounting.integration.producer;
 
 import com.company.accounting.integration.event.JournalEntryEvent;
+import com.company.accounting.integration.event.InventoryEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.core.KafkaTemplate;
@@ -17,5 +18,10 @@ public class MonolithEventProducer {
     public void publishEvent(JournalEntryEvent event) {
         log.info("Publishing event to topic {}: {}", TOPIC, event);
         kafkaTemplate.send(TOPIC, event.getTransactionId(), event);
+    }
+
+    public void publishInventoryEvent(InventoryEvent event) {
+        log.info("Publishing InventoryEvent to topic inventory-events: {}", event);
+        kafkaTemplate.send("inventory-events", event.getTransactionId(), event);
     }
 }

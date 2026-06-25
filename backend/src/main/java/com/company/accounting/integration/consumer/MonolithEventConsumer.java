@@ -4,7 +4,9 @@ import com.company.accounting.domain.purchase.entity.PurchaseOrder;
 import com.company.accounting.domain.purchase.repository.PurchaseOrderRepository;
 import com.company.accounting.domain.sales.entity.SaleOrder;
 import com.company.accounting.domain.sales.repository.SaleOrderRepository;
+import com.company.accounting.domain.sales.service.SaleOrderService;
 import com.company.accounting.integration.event.JournalEntryEvent;
+import com.company.accounting.integration.event.InventoryResultEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;
@@ -19,6 +21,7 @@ public class MonolithEventConsumer {
 
     private final PurchaseOrderRepository purchaseOrderRepository;
     private final SaleOrderRepository saleOrderRepository;
+    private final org.springframework.context.annotation.Lazy @org.springframework.beans.factory.annotation.Autowired SaleOrderService saleOrderService;
 
     @KafkaListener(topics = "accounting-events", groupId = "monolith-group")
     @Transactional
@@ -50,6 +53,25 @@ public class MonolithEventConsumer {
         } else if ("JOURNAL_ENTRY_CREATED".equals(event.getEventType())) {
             log.info("Saga Success: Journal entry created successfully for transaction {}", event.getTransactionId());
             // Could optionally update status to "COMPLETED_ACCOUNTING"
+        }
+    }
+
+    @KafkaListener(topics = "inventory-results", groupId = "monolith-group")
+    @Transactional
+    public void consumeInventoryResult(InventoryResultEvent event) {
+        log.info("Received inventory result: {}", event);
+
+        com.company.accounting.core.tenant.TenantContext.setCurrentTenant(event.getTenantId());
+        try {
+            if ("SUCCESS".equals(event.getStatus())) {
+                log.info("Saga Success: Inventory deducted for {}. Completing SaleOrder.", event.getTransactionId());
+                saleOrderService.completeSaleOrder(event.getTransactionId());
+            } else {
+                log.error("Saga Compensation: Inventory deduction failed for {}. Reason: {}", event.getTransactionId(), event.getMessage());
+                saleOrderService.failSaleOrder(event.getTransactionId(), event.getMessage());
+            }
+        } finally {
+            com.company.accounting.core.tenant.TenantContext.clear();
         }
     }
 }

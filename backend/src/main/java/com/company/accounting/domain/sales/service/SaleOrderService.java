@@ -32,7 +32,6 @@ public class SaleOrderService {
     private final SaleOrderRepository saleOrderRepository;
     private final CustomerRepository customerRepository;
     private final ProductRepository productRepository;
-    private final InventoryService inventoryService;
     private final MonolithEventProducer monolithEventProducer;
 
     public List<SaleOrder> getAllSaleOrders() {
@@ -40,7 +39,7 @@ public class SaleOrderService {
     }
 
     @Transactional
-    public SaleOrder createAndCompleteSaleOrder(SaleOrderCreateRequest request) {
+    public SaleOrder createSaleOrder(SaleOrderCreateRequest request) {
         Customer customer = null;
         if (request.getCustomerId() != null && request.getCustomerId() > 0) {
             customer = customerRepository.findById(request.getCustomerId())
@@ -51,22 +50,18 @@ public class SaleOrderService {
                 .invoiceNumber("INV-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase())
                 .customer(customer)
                 .saleDate(LocalDate.now())
-                .status("COMPLETED")
+                .status("PENDING")
                 .tenantId(TenantContext.getCurrentTenant())
                 .build();
 
         BigDecimal totalAmount = BigDecimal.ZERO;
         BigDecimal totalTax = BigDecimal.ZERO;
 
+        List<com.company.accounting.integration.event.InventoryEvent.StockItem> stockItems = new java.util.ArrayList<>();
+
         for (SaleOrderItemRequest itemReq : request.getItems()) {
             Product product = productRepository.findById(itemReq.getProductId())
                     .orElseThrow(() -> new RuntimeException("Product not found"));
-
-            // Check inventory
-            BigDecimal currentStock = inventoryService.getStockBalance(product.getId(), request.getSourceWarehouseId());
-            if (currentStock == null || currentStock.compareTo(itemReq.getQuantity()) < 0) {
-                throw new RuntimeException("Insufficient stock for product: " + product.getName() + " in the selected warehouse.");
-            }
 
             BigDecimal subTotal = itemReq.getUnitPrice().multiply(itemReq.getQuantity());
             
@@ -91,13 +86,10 @@ public class SaleOrderService {
 
             order.addItem(item);
 
-            // Integrate with Inventory: Stock OUT (negative quantity)
-            inventoryService.adjustStock(
-                    product.getId(),
-                    request.getSourceWarehouseId(),
-                    itemReq.getQuantity().negate(), // IMPORTANT: Negative for Stock OUT
-                    "SALE"
-            );
+            stockItems.add(com.company.accounting.integration.event.InventoryEvent.StockItem.builder()
+                    .productId(product.getId())
+                    .quantity(itemReq.getQuantity())
+                    .build());
         }
 
         order.setTotalAmount(totalAmount);
@@ -105,36 +97,75 @@ public class SaleOrderService {
         order.setGrandTotal(totalAmount.add(totalTax));
         SaleOrder savedOrder = saleOrderRepository.save(order);
 
+        // Publish InventoryEvent to deduct stock asynchronously
+        com.company.accounting.integration.event.InventoryEvent event = 
+                com.company.accounting.integration.event.InventoryEvent.builder()
+                .transactionId(savedOrder.getInvoiceNumber())
+                .eventType("DEDUCT_STOCK")
+                .tenantId(TenantContext.getCurrentTenant())
+                .items(stockItems)
+                .warehouseId(request.getSourceWarehouseId())
+                .build();
+                
+        monolithEventProducer.publishInventoryEvent(event);
+
+        return savedOrder;
+    }
+
+    @Transactional
+    public void completeSaleOrder(String invoiceNumber) {
+        SaleOrder order = saleOrderRepository.findByInvoiceNumber(invoiceNumber)
+                .orElseThrow(() -> new RuntimeException("SaleOrder not found"));
+
+        if (!"PENDING".equals(order.getStatus())) {
+            return;
+        }
+
+        order.setStatus("COMPLETED");
+        saleOrderRepository.save(order);
+
         // Core Accounting Integration via Kafka Event
         JournalEntryCreateRequest jeRequest = new JournalEntryCreateRequest();
-        jeRequest.setEntryDate(savedOrder.getSaleDate());
-        jeRequest.setDescription("POS Sale - " + savedOrder.getInvoiceNumber());
-        jeRequest.setReferenceNumber(savedOrder.getInvoiceNumber());
+        jeRequest.setEntryDate(order.getSaleDate());
+        jeRequest.setDescription("POS Sale - " + order.getInvoiceNumber());
+        jeRequest.setReferenceNumber(order.getInvoiceNumber());
 
         JournalEntryLineRequest debitCash = new JournalEntryLineRequest();
         debitCash.setLedgerName("Cash");
-        debitCash.setDebitAmount(savedOrder.getGrandTotal());
+        debitCash.setDebitAmount(order.getGrandTotal());
 
         JournalEntryLineRequest creditSales = new JournalEntryLineRequest();
         creditSales.setLedgerName("Sales");
-        creditSales.setCreditAmount(savedOrder.getTotalAmount());
+        creditSales.setCreditAmount(order.getTotalAmount());
 
         JournalEntryLineRequest creditTax = new JournalEntryLineRequest();
         creditTax.setLedgerName("Output Tax (GST)");
-        creditTax.setCreditAmount(savedOrder.getTotalTax());
+        creditTax.setCreditAmount(order.getTotalTax());
 
         jeRequest.setLines(java.util.Arrays.asList(debitCash, creditSales, creditTax));
         
         com.company.accounting.integration.event.JournalEntryEvent event = 
                 com.company.accounting.integration.event.JournalEntryEvent.builder()
-                .transactionId(savedOrder.getInvoiceNumber())
+                .transactionId(order.getInvoiceNumber())
                 .eventType("CREATE_JOURNAL_ENTRY")
-                .tenantId(TenantContext.getCurrentTenant())
+                .tenantId(order.getTenantId())
                 .request(jeRequest)
                 .build();
                 
         monolithEventProducer.publishEvent(event);
+    }
 
-        return savedOrder;
+    @Transactional
+    public void failSaleOrder(String invoiceNumber, String reason) {
+        SaleOrder order = saleOrderRepository.findByInvoiceNumber(invoiceNumber)
+                .orElseThrow(() -> new RuntimeException("SaleOrder not found"));
+
+        if (!"PENDING".equals(order.getStatus())) {
+            return;
+        }
+
+        order.setStatus("FAILED");
+        // We could store the reason in a notes field if it existed
+        saleOrderRepository.save(order);
     }
 }
