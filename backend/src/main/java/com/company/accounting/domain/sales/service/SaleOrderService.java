@@ -1,6 +1,5 @@
 package com.company.accounting.domain.sales.service;
 
-import com.company.accounting.domain.inventory.service.InventoryService;
 import com.company.accounting.domain.product.entity.Product;
 import com.company.accounting.domain.product.repository.ProductRepository;
 import com.company.accounting.domain.sales.dto.SaleOrderCreateRequest;
@@ -169,3 +168,4 @@ public class SaleOrderService {
         saleOrderRepository.save(order);
     }
 }
+

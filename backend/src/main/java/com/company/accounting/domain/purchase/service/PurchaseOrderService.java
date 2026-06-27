@@ -1,6 +1,6 @@
 package com.company.accounting.domain.purchase.service;
 
-import com.company.accounting.domain.inventory.service.InventoryService;
+
 import com.company.accounting.domain.product.entity.Product;
 import com.company.accounting.domain.product.repository.ProductRepository;
 import com.company.accounting.domain.purchase.dto.PurchaseOrderCreateRequest;
@@ -32,7 +32,7 @@ public class PurchaseOrderService {
     private final PurchaseOrderRepository purchaseOrderRepository;
     private final SupplierRepository supplierRepository;
     private final ProductRepository productRepository;
-    private final InventoryService inventoryService;
+
     private final MonolithEventProducer monolithEventProducer;
 
     public List<PurchaseOrder> getAllPurchaseOrders() {
@@ -40,7 +40,7 @@ public class PurchaseOrderService {
     }
 
     @Transactional
-    public PurchaseOrder createAndCompletePurchaseOrder(PurchaseOrderCreateRequest request) {
+    public PurchaseOrder createPurchaseOrder(PurchaseOrderCreateRequest request) {
         Supplier supplier = supplierRepository.findById(request.getSupplierId())
                 .orElseThrow(() -> new RuntimeException("Supplier not found"));
 
@@ -48,12 +48,14 @@ public class PurchaseOrderService {
                 .orderNumber("PO-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase())
                 .supplier(supplier)
                 .orderDate(LocalDate.now())
-                .status("COMPLETED")
+                .status("PENDING")
                 .tenantId(TenantContext.getCurrentTenant())
                 .build();
 
         BigDecimal totalAmount = BigDecimal.ZERO;
         BigDecimal totalTax = BigDecimal.ZERO;
+
+        List<com.company.accounting.integration.event.InventoryEvent.StockItem> stockItems = new java.util.ArrayList<>();
 
         for (PurchaseOrderItemRequest itemReq : request.getItems()) {
             Product product = productRepository.findById(itemReq.getProductId())
@@ -82,13 +84,10 @@ public class PurchaseOrderService {
 
             order.addItem(item);
 
-            // Integrate with Inventory: Stock IN
-            inventoryService.adjustStock(
-                    product.getId(),
-                    request.getTargetWarehouseId(),
-                    itemReq.getQuantity(),
-                    "PURCHASE"
-            );
+            stockItems.add(com.company.accounting.integration.event.InventoryEvent.StockItem.builder()
+                    .productId(product.getId())
+                    .quantity(itemReq.getQuantity())
+                    .build());
         }
 
         order.setTotalAmount(totalAmount);
@@ -96,36 +95,74 @@ public class PurchaseOrderService {
         order.setGrandTotal(totalAmount.add(totalTax));
         PurchaseOrder savedOrder = purchaseOrderRepository.save(order);
 
+        // Publish InventoryEvent to add stock asynchronously
+        com.company.accounting.integration.event.InventoryEvent event = 
+                com.company.accounting.integration.event.InventoryEvent.builder()
+                .transactionId(savedOrder.getOrderNumber())
+                .eventType("ADD_STOCK")
+                .tenantId(TenantContext.getCurrentTenant())
+                .items(stockItems)
+                .warehouseId(request.getTargetWarehouseId())
+                .build();
+                
+        monolithEventProducer.publishInventoryEvent(event);
+
+        return savedOrder;
+    }
+
+    @Transactional
+    public void completePurchaseOrder(String orderNumber) {
+        PurchaseOrder order = purchaseOrderRepository.findByOrderNumber(orderNumber)
+                .orElseThrow(() -> new RuntimeException("PurchaseOrder not found"));
+
+        if (!"PENDING".equals(order.getStatus())) {
+            return;
+        }
+
+        order.setStatus("COMPLETED");
+        purchaseOrderRepository.save(order);
+
         // Core Accounting Integration via Kafka Event
         JournalEntryCreateRequest jeRequest = new JournalEntryCreateRequest();
-        jeRequest.setEntryDate(savedOrder.getOrderDate());
-        jeRequest.setDescription("PO Purchase - " + savedOrder.getOrderNumber());
-        jeRequest.setReferenceNumber(savedOrder.getOrderNumber());
+        jeRequest.setEntryDate(order.getOrderDate());
+        jeRequest.setDescription("PO Purchase - " + order.getOrderNumber());
+        jeRequest.setReferenceNumber(order.getOrderNumber());
 
         JournalEntryLineRequest debitPurchases = new JournalEntryLineRequest();
         debitPurchases.setLedgerName("Purchases");
-        debitPurchases.setDebitAmount(savedOrder.getTotalAmount());
+        debitPurchases.setDebitAmount(order.getTotalAmount());
 
         JournalEntryLineRequest debitTax = new JournalEntryLineRequest();
         debitTax.setLedgerName("Input Tax (GST)");
-        debitTax.setDebitAmount(savedOrder.getTotalTax());
+        debitTax.setDebitAmount(order.getTotalTax());
 
         JournalEntryLineRequest creditCash = new JournalEntryLineRequest();
         creditCash.setLedgerName("Cash");
-        creditCash.setCreditAmount(savedOrder.getGrandTotal());
+        creditCash.setCreditAmount(order.getGrandTotal());
 
         jeRequest.setLines(java.util.Arrays.asList(debitPurchases, debitTax, creditCash));
 
         com.company.accounting.integration.event.JournalEntryEvent event = 
                 com.company.accounting.integration.event.JournalEntryEvent.builder()
-                .transactionId(savedOrder.getOrderNumber())
+                .transactionId(order.getOrderNumber())
                 .eventType("CREATE_JOURNAL_ENTRY")
-                .tenantId(TenantContext.getCurrentTenant())
+                .tenantId(order.getTenantId())
                 .request(jeRequest)
                 .build();
                 
         monolithEventProducer.publishEvent(event);
+    }
 
-        return savedOrder;
+    @Transactional
+    public void failPurchaseOrder(String orderNumber, String reason) {
+        PurchaseOrder order = purchaseOrderRepository.findByOrderNumber(orderNumber)
+                .orElseThrow(() -> new RuntimeException("PurchaseOrder not found"));
+
+        if (!"PENDING".equals(order.getStatus())) {
+            return;
+        }
+
+        order.setStatus("FAILED");
+        purchaseOrderRepository.save(order);
     }
 }

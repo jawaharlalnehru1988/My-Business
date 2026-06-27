@@ -2,6 +2,7 @@ package com.company.accounting.integration.consumer;
 
 import com.company.accounting.domain.purchase.entity.PurchaseOrder;
 import com.company.accounting.domain.purchase.repository.PurchaseOrderRepository;
+import com.company.accounting.domain.purchase.service.PurchaseOrderService;
 import com.company.accounting.domain.sales.entity.SaleOrder;
 import com.company.accounting.domain.sales.repository.SaleOrderRepository;
 import com.company.accounting.domain.sales.service.SaleOrderService;
@@ -21,7 +22,13 @@ public class MonolithEventConsumer {
 
     private final PurchaseOrderRepository purchaseOrderRepository;
     private final SaleOrderRepository saleOrderRepository;
-    private final org.springframework.context.annotation.Lazy @org.springframework.beans.factory.annotation.Autowired SaleOrderService saleOrderService;
+    @org.springframework.context.annotation.Lazy
+    @org.springframework.beans.factory.annotation.Autowired
+    private SaleOrderService saleOrderService;
+    
+    @org.springframework.context.annotation.Lazy
+    @org.springframework.beans.factory.annotation.Autowired
+    private PurchaseOrderService purchaseOrderService;
 
     @KafkaListener(topics = "accounting-events", groupId = "monolith-group")
     @Transactional
@@ -64,14 +71,23 @@ public class MonolithEventConsumer {
         com.company.accounting.core.tenant.TenantContext.setCurrentTenant(event.getTenantId());
         try {
             if ("SUCCESS".equals(event.getStatus())) {
-                log.info("Saga Success: Inventory deducted for {}. Completing SaleOrder.", event.getTransactionId());
-                saleOrderService.completeSaleOrder(event.getTransactionId());
+                log.info("Saga Success: Inventory processed for {}. Completing Order.", event.getTransactionId());
+                if (event.getTransactionId() != null && event.getTransactionId().startsWith("PO-")) {
+                    purchaseOrderService.completePurchaseOrder(event.getTransactionId());
+                } else if (event.getTransactionId() != null && event.getTransactionId().startsWith("INV-")) {
+                    saleOrderService.completeSaleOrder(event.getTransactionId());
+                }
             } else {
-                log.error("Saga Compensation: Inventory deduction failed for {}. Reason: {}", event.getTransactionId(), event.getMessage());
-                saleOrderService.failSaleOrder(event.getTransactionId(), event.getMessage());
+                log.error("Saga Compensation: Inventory failed for {}. Reason: {}", event.getTransactionId(), event.getMessage());
+                if (event.getTransactionId() != null && event.getTransactionId().startsWith("PO-")) {
+                    purchaseOrderService.failPurchaseOrder(event.getTransactionId(), event.getMessage());
+                } else if (event.getTransactionId() != null && event.getTransactionId().startsWith("INV-")) {
+                    saleOrderService.failSaleOrder(event.getTransactionId(), event.getMessage());
+                }
             }
         } finally {
             com.company.accounting.core.tenant.TenantContext.clear();
         }
     }
 }
+

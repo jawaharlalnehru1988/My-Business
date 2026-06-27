@@ -2,8 +2,7 @@ package com.company.accounting.domain.reporting.service;
 
 import com.company.accounting.core.tenant.TenantContext;
 
-import com.company.accounting.domain.inventory.entity.StockTransaction;
-import com.company.accounting.domain.inventory.repository.StockTransactionRepository;
+
 import com.company.accounting.domain.product.entity.Product;
 import com.company.accounting.domain.product.repository.ProductRepository;
 import com.company.accounting.domain.purchase.entity.PurchaseOrder;
@@ -30,7 +29,6 @@ public class ReportingService {
     private final CustomerRepository customerRepository;
     private final SupplierRepository supplierRepository;
     private final ProductRepository productRepository;
-    private final StockTransactionRepository stockTransactionRepository;
 
     public DashboardMetricsDTO getDashboardMetrics() {
         Long tenantId = TenantContext.getCurrentTenant();
@@ -54,27 +52,9 @@ public class ReportingService {
         long customers = customerRepository.findByTenantId(tenantId).size();
         long suppliers = supplierRepository.findByTenantId(tenantId).size();
 
-        // Low Stock
+        // Low Stock (Now maintained by Inventory Microservice)
+        // TODO: Call Inventory Service via REST/Feign to get low stock items.
         List<LowStockItemDTO> lowStockItems = new ArrayList<>();
-        List<Product> products = productRepository.findByTenantId(tenantId);
-        for (Product product : products) {
-            BigDecimal minimum = BigDecimal.valueOf(10); // Default threshold for MVP
-            
-            // Calculate total stock across all warehouses
-            List<StockTransaction> txns = stockTransactionRepository.findByProductId(product.getId());
-            BigDecimal currentStock = txns.stream()
-                    .map(StockTransaction::getQuantity)
-                    .reduce(BigDecimal.ZERO, BigDecimal::add);
-
-            if (currentStock.compareTo(minimum) <= 0) {
-                lowStockItems.add(LowStockItemDTO.builder()
-                        .productName(product.getName())
-                        .sku(product.getSku())
-                        .currentStock(currentStock)
-                        .minimumStock(minimum)
-                        .build());
-            }
-        }
 
         return DashboardMetricsDTO.builder()
                 .totalSales(totalSales)

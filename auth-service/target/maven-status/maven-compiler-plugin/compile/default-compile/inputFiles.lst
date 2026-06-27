@@ -1,0 +1,15 @@
+D:\projects\accounting-system\auth-service\src\main\java\com\company\auth\AuthServiceApplication.java
+D:\projects\accounting-system\auth-service\src\main\java\com\company\auth\core\config\DataSeeder.java
+D:\projects\accounting-system\auth-service\src\main\java\com\company\auth\core\config\RestConfig.java
+D:\projects\accounting-system\auth-service\src\main\java\com\company\auth\core\security\CustomUserDetails.java
+D:\projects\accounting-system\auth-service\src\main\java\com\company\auth\core\security\CustomUserDetailsService.java
+D:\projects\accounting-system\auth-service\src\main\java\com\company\auth\core\security\JwtUtil.java
+D:\projects\accounting-system\auth-service\src\main\java\com\company\auth\core\security\SecurityConfig.java
+D:\projects\accounting-system\auth-service\src\main\java\com\company\auth\domain\auth\controller\AuthController.java
+D:\projects\accounting-system\auth-service\src\main\java\com\company\auth\domain\auth\dto\AuthRequest.java
+D:\projects\accounting-system\auth-service\src\main\java\com\company\auth\domain\auth\dto\AuthResponse.java
+D:\projects\accounting-system\auth-service\src\main\java\com\company\auth\domain\auth\dto\RegisterRequest.java
+D:\projects\accounting-system\auth-service\src\main\java\com\company\auth\domain\auth\entity\Role.java
+D:\projects\accounting-system\auth-service\src\main\java\com\company\auth\domain\auth\entity\User.java
+D:\projects\accounting-system\auth-service\src\main\java\com\company\auth\domain\auth\repository\UserRepository.java
+D:\projects\accounting-system\auth-service\src\main\java\com\company\auth\domain\auth\service\AuthService.java

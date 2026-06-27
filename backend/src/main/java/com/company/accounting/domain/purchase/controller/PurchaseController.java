@@ -41,6 +41,7 @@ public class PurchaseController {
 
     @PostMapping("/orders")
     public ResponseEntity<PurchaseOrder> createPurchaseOrder(@RequestBody PurchaseOrderCreateRequest request) {
-        return ResponseEntity.ok(purchaseOrderService.createAndCompletePurchaseOrder(request));
+        return ResponseEntity.ok(purchaseOrderService.createPurchaseOrder(request));
     }
 }
+
