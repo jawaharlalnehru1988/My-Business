@@ -1,6 +1,5 @@
-package com.company.accounting.domain.reporting.dto;
+package com.company.reporting.dto;
 
-import com.company.accounting.domain.product.entity.Product;
 import lombok.Builder;
 import lombok.Data;
 

@@ -1,4 +1,4 @@
-package com.company.accounting.domain.reporting.dto;
+package com.company.reporting.dto;
 
 import lombok.Builder;
 import lombok.Data;

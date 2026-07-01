@@ -1,7 +1,7 @@
-package com.company.accounting.domain.reporting.controller;
+package com.company.reporting.controller;
 
-import com.company.accounting.domain.reporting.dto.DashboardMetricsDTO;
-import com.company.accounting.domain.reporting.service.ReportingService;
+import com.company.reporting.dto.DashboardMetricsDTO;
+import com.company.reporting.service.ReportingService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;

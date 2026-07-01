@@ -142,6 +142,22 @@ services:
         limits:
           memory: 384M
 
+  reporting-service:
+    build:
+      context: ./reporting-service
+    depends_on:
+      - service-registry
+      - backend
+    ports:
+      - "8084:8084"
+    environment:
+      - JAVA_OPTS=-Xms128m -Xmx256m
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://service-registry:8761/eureka/
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
   frontend:
     build:
       context: ./frontend
