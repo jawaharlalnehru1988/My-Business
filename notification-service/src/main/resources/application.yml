@@ -15,6 +15,10 @@ spring:
           auth: true
           starttls:
             enable: true
+  vapid:
+    public-key: BEl62iUYgUivxIkv69yViEuiBIa-Ib9-SkvMeAtA3LFgDzkrxZJjSgSnfckjBJuBkr3qLOWI-M2X8eF6RStTMI0
+    private-key: Yw-H8L-zQ0RjZ4Yg5z1dJw2y4z9Wf6FhA4G_2G9w2qE
+    subject: mailto:admin@accounting.com
   kafka:
     bootstrap-servers: localhost:9092
     consumer:

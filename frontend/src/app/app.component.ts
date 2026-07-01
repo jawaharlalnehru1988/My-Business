@@ -6,6 +6,7 @@ import { Tenant } from './core/models/tenant.model';
 
 import { AuthService } from './core/auth/services/auth.service';
 import { Router } from '@angular/router';
+import { PushNotificationService } from './push-notification.service';
 
 @Component({
   selector: 'app-root',
@@ -18,8 +19,10 @@ export class AppComponent implements OnInit {
   title = 'frontend';
   public authService = inject(AuthService);
   private router = inject(Router);
+  private pushNotificationService = inject(PushNotificationService);
 
   ngOnInit() {
+    this.pushNotificationService.subscribeToNotifications();
   }
 
   logout() {
