@@ -152,6 +152,19 @@ public class SaleOrderService {
                 .build();
                 
         monolithEventProducer.publishEvent(event);
+
+        // Also publish Notification Event for the owner
+        com.company.accounting.integration.event.NotificationEvent notifEvent =
+                com.company.accounting.integration.event.NotificationEvent.builder()
+                .eventType("SALE_COMPLETED")
+                .tenantId(order.getTenantId())
+                .transactionId(order.getInvoiceNumber())
+                .totalAmount(order.getGrandTotal())
+                .recipientEmail("admin@accounting.com")
+                .timestamp(java.time.LocalDateTime.now())
+                .build();
+                
+        monolithEventProducer.publishNotificationEvent(notifEvent);
     }
 
     @Transactional
