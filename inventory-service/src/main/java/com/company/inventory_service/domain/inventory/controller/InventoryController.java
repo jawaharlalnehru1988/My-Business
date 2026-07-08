@@ -33,12 +33,27 @@ public class InventoryController {
     }
 
     @PostMapping("/stock/adjust")
-    public ResponseEntity<StockTransaction> adjustStock(
+    public ResponseEntity<com.company.inventory_service.domain.inventory.dto.StockTransactionDto> adjustStock(
             @RequestParam Long productId,
             @RequestParam Long warehouseId,
             @RequestParam BigDecimal quantity,
             @RequestParam String type) {
-        return ResponseEntity.ok(inventoryService.adjustStock(productId, warehouseId, quantity, type));
+        StockTransaction tx = inventoryService.adjustStock(productId, warehouseId, quantity, type);
+        com.company.inventory_service.domain.inventory.dto.StockTransactionDto dto = com.company.inventory_service.domain.inventory.dto.StockTransactionDto.builder()
+                .id(tx.getId())
+                .product(com.company.inventory_service.domain.inventory.dto.StockTransactionDto.ProductInfo.builder()
+                        .id(tx.getProductId())
+                        .name("Product " + tx.getProductId())
+                        .build())
+                .warehouse(com.company.inventory_service.domain.inventory.dto.StockTransactionDto.WarehouseInfo.builder()
+                        .id(tx.getWarehouse().getId())
+                        .name(tx.getWarehouse().getName())
+                        .build())
+                .quantity(tx.getQuantity())
+                .transactionType(tx.getTransactionType())
+                .createdAt(tx.getCreatedAt())
+                .build();
+        return ResponseEntity.ok(dto);
     }
 
     @GetMapping("/stock/balance")

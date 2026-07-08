@@ -8,4 +8,5 @@ public class PurchaseOrderItemRequest {
     private Long productId;
     private BigDecimal quantity;
     private BigDecimal unitPrice;
+    private BigDecimal taxPercentage;
 }
