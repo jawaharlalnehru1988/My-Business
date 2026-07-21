@@ -10,11 +10,11 @@ spring:
         - id: accounting-service
           uri: lb://ACCOUNTING-SERVICE
           predicates:
-            - Path=/api/accounting/**
+            - Path=/api/v1/accounting/**, /api/v1/clients/**, /api/v1/bills/**, /api/v1/profile, /api/v1/profiles/**, /api/v1/expenses/**, /api/v1/purchases/**, /api/v1/recurring/**, /api/v1/receipts/**, /api/v1/templates/**
         - id: inventory-service
           uri: lb://INVENTORY-SERVICE
           predicates:
-            - Path=/api/v1/inventory/**, /api/v1/barcodes/**
+            - Path=/api/v1/inventory/**, /api/v1/barcodes/**, /api/v1/products/**
         - id: auth-service
           uri: lb://AUTH-SERVICE
           predicates:
