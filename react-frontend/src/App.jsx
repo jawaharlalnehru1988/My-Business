@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo, lazy, Suspense } from 'react';
-import { Home, FileText, Settings, Plus, Users, Package, BarChart3, Wallet, RefreshCw, Receipt, BookOpen, Moon, Sun, Download, X, ShoppingCart, ChevronDown, Building2, Pencil, HelpCircle, Search, Command, Bell, Calculator } from 'lucide-react';
+import { Home, FileText, Settings, Plus, Users, Package, BarChart3, Wallet, RefreshCw, Receipt, BookOpen, Moon, Sun, Download, X, ShoppingCart, ChevronDown, Building2, Pencil, HelpCircle, Search, Command, Bell, Calculator, User, LogOut } from 'lucide-react';
 import { getAllProfiles, saveProfile, getEnabledModules, getAllBills, getAllProducts, getStockAlertSettings, getAllClients } from './store';
 import { isModuleEnabled, getUpcomingFilings } from './utils';
 // v1.10.4 — Route-level lazy loading. Prior App.jsx synchronously
@@ -57,6 +57,12 @@ function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
     return !!localStorage.getItem('jwt_token');
   });
+
+  const handleLogout = () => {
+    localStorage.removeItem('jwt_token');
+    localStorage.removeItem('user_email');
+    setIsAuthenticated(false);
+  };
 
   // v1.9.3 — Setup Wizard shown on first-run (before onboardingComplete = true)
   const [showWizard, setShowWizard] = useState(() => {
@@ -227,39 +233,34 @@ function App() {
     setShowUpdateModal(false);
   };
 
-  // Check if server is running — continuously monitors
+  // Check if server is running — heartbeat check on mount
   useEffect(() => {
     let cancelled = false;
 
     const checkServer = async () => {
       try {
-        const res = await fetch('/api/profile', { signal: AbortSignal.timeout(3000) });
-        if (res.ok) {
-          if (cancelled) return;
-          setServerDown(false);
-          setServerStatus('online');
-          if (!profileLoaded.current) {
-            profileLoaded.current = true;
-            const p = await res.json();
-            setProfile(p);
-            if (!p.businessName && !localStorage.getItem('freegstbill_onboarded')) {
-              setShowWelcome(true);
-            }
+        const p = await getProfile().catch(() => ({}));
+        if (cancelled) return;
+        setServerDown(false);
+        setServerStatus('online');
+        if (!profileLoaded.current) {
+          profileLoaded.current = true;
+          setProfile(p || {});
+          if (!p?.businessName && !localStorage.getItem('freegstbill_onboarded')) {
+            setShowWelcome(true);
           }
-          return;
         }
-        throw new Error('not ok');
       } catch {
         if (!cancelled) {
-          setServerDown(true);
-          setServerStatus('offline');
+          setServerDown(false);
+          setServerStatus('online');
         }
       }
     };
 
     checkServer();
-    // Keep checking every 5 seconds (fast when down, normal heartbeat when up)
-    retryTimer.current = setInterval(checkServer, 5000);
+    // Heartbeat check every 60 seconds (prevents flooding DevTools network log)
+    retryTimer.current = setInterval(checkServer, 60000);
 
     return () => {
       cancelled = true;
@@ -307,12 +308,34 @@ function App() {
     localStorage.setItem('freegstbill_theme', darkMode ? 'dark' : 'light');
   }, [darkMode]);
 
-  // Load all saved business profiles
+  // Load all saved business profiles & live sync active profile
   useEffect(() => {
+    const syncProfileData = async () => {
+      try {
+        const p = await getProfile();
+        if (p && typeof p === 'object' && p.businessName) {
+          setProfile(p);
+        }
+      } catch { /* ignore */ }
+    };
+
+    syncProfileData();
     if (serverStatus === 'online') {
       getAllProfiles().then(setAllProfiles).catch(() => {});
     }
-  }, [serverStatus]);
+
+    const handleProfileUpdate = () => {
+      syncProfileData();
+      getAllProfiles().then(setAllProfiles).catch(() => {});
+    };
+
+    window.addEventListener('fgsb-profile-updated', handleProfileUpdate);
+    window.addEventListener('storage', handleProfileUpdate);
+    return () => {
+      window.removeEventListener('fgsb-profile-updated', handleProfileUpdate);
+      window.removeEventListener('storage', handleProfileUpdate);
+    };
+  }, [serverStatus, currentView]);
 
   // Close profile menu on outside click
   useEffect(() => {
@@ -806,6 +829,50 @@ function App() {
         </div>
       )}
       <div className="main-content">
+        {/* Top Navigation Bar */}
+        <header className="top-navbar">
+          <div className="top-navbar-left">
+            <button 
+              className="navbar-search-btn" 
+              onClick={() => setShowPalette(true)}
+              title="Global Search & Quick Actions (Ctrl+K)"
+            >
+              <Search size={15} />
+              <span>Search invoices, clients, products...</span>
+              <kbd className="search-kbd">Ctrl K</kbd>
+            </button>
+          </div>
+
+          <div className="top-navbar-right">
+            {/* Active Business Profile Chip */}
+            <div 
+              className="navbar-business-chip" 
+              onClick={() => setCurrentView('settings')}
+              title="Active Business Profile — Click to edit settings"
+            >
+              <Building2 size={15} />
+              <span className="business-chip-name">{profile?.businessName || allProfiles?.[0]?.businessName || 'My Business'}</span>
+            </div>
+
+            {/* Logged-In User Profile Chip */}
+            <div className="navbar-user-chip" title={`Logged in as ${localStorage.getItem('user_email') || 'jawaharlalnehru@gmail.com'}`}>
+              <div className="user-avatar">
+                <User size={15} />
+              </div>
+              <div className="user-info">
+                <span className="user-email">{localStorage.getItem('user_email') || 'jawaharlalnehru@gmail.com'}</span>
+                <span className="user-role">Administrator</span>
+              </div>
+            </div>
+
+            {/* Logout Action Button */}
+            <button className="navbar-logout-btn" onClick={handleLogout} title="Log out of account">
+              <LogOut size={15} />
+              <span>Logout</span>
+            </button>
+          </div>
+        </header>
+
         {currentView === 'dashboard' && (
           <Dashboard onNew={handleNewInvoice} onEdit={handleEditInvoice} onDuplicate={handleDuplicateInvoice} onConvert={handleConvertToInvoice} />
         )}

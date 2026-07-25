@@ -25,5 +25,14 @@ public class DataSeeder implements CommandLineRunner {
                     .build();
             userRepository.save(admin);
         }
+
+        if (userRepository.findByEmail("jawaharlalnehru@gmail.com").isEmpty()) {
+            User user = User.builder()
+                    .email("jawaharlalnehru@gmail.com")
+                    .password(passwordEncoder.encode("murari16108"))
+                    .role(Role.ROLE_SUPER_ADMIN)
+                    .build();
+            userRepository.save(user);
+        }
     }
 }

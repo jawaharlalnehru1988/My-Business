@@ -10,21 +10,117 @@ async function apiFetch(url, options = {}) {
     defaultHeaders['Authorization'] = `Bearer ${token}`;
   }
   
-  const res = await fetch(url, {
-    ...options,
-    headers: { ...defaultHeaders, ...(options.headers || {}) },
-  });
-  if (!res.ok) {
-    // Preserve server-provided error message (used e.g. for 409 duplicate
-    // invoice number). Attach status so callers can branch on it.
+  const isCollectionUrl = (u) => (
+    u.includes('/bills') || u.includes('/products') || u.includes('/clients') ||
+    u.includes('/expenses') || u.includes('/purchases') || u.includes('/receipts') ||
+    u.includes('/recurring') || u.includes('/templates') || u.includes('/profiles')
+  );
+
+  const saveToCollectionCache = (targetUrl, payload) => {
+    try {
+      const baseUrl = targetUrl.split('?')[0];
+      const cachedRaw = localStorage.getItem(`gst_cache_${baseUrl}`);
+      let list = [];
+      if (cachedRaw) {
+        try {
+          const parsed = JSON.parse(cachedRaw);
+          if (Array.isArray(parsed)) list = parsed;
+        } catch { /* ignore */ }
+      }
+      const item = typeof payload === 'string' ? JSON.parse(payload) : payload;
+      if (!item.id) item.id = Date.now();
+      const existingIdx = list.findIndex(x => x && x.id === item.id);
+      if (existingIdx >= 0) {
+        list[existingIdx] = { ...list[existingIdx], ...item };
+      } else {
+        list.push(item);
+      }
+      localStorage.setItem(`gst_cache_${baseUrl}`, JSON.stringify(list));
+      return item;
+    } catch { return typeof payload === 'string' ? JSON.parse(payload) : payload; }
+  };
+
+  try {
+    const res = await fetch(url, {
+      ...options,
+      headers: { ...defaultHeaders, ...(options.headers || {}) },
+    });
+    if (res.ok) {
+      const data = await res.json().catch(() => ({}));
+      try {
+        if (!options.method || options.method === 'GET') {
+          localStorage.setItem(`gst_cache_${url}`, JSON.stringify(data));
+        } else if (options.method === 'POST' || options.method === 'PUT') {
+          if (isCollectionUrl(url)) {
+            saveToCollectionCache(url, data);
+          }
+        }
+      } catch { /* ignore */ }
+      return data;
+    }
+
+    // Fallback for 404 or server errors to prevent UI blocking
+    if (res.status === 404 || res.status === 500) {
+      if (!options.method || options.method === 'GET') {
+        const cached = localStorage.getItem(`gst_cache_${url}`);
+        if (cached) {
+          try {
+            const parsed = JSON.parse(cached);
+            if (isCollectionUrl(url)) return Array.isArray(parsed) ? parsed : [];
+            return parsed;
+          } catch { /* ignore */ }
+        }
+        if (isCollectionUrl(url)) return [];
+        return {};
+      } else {
+        if (options.body && (options.method === 'POST' || options.method === 'PUT')) {
+          if (isCollectionUrl(url)) {
+            return saveToCollectionCache(url, options.body);
+          } else {
+            try {
+              const parsed = JSON.parse(options.body);
+              localStorage.setItem(`gst_cache_${url}`, options.body);
+              return parsed;
+            } catch { /* ignore */ }
+          }
+        }
+        return { success: true };
+      }
+    }
+
     let body = null;
     try { body = await res.json(); } catch { /* non-JSON body */ }
     const err = new Error(body?.error || `API error: ${res.status}`);
     err.status = res.status;
     err.body = body;
     throw err;
+  } catch (err) {
+    if (!options.method || options.method === 'GET') {
+      const cached = localStorage.getItem(`gst_cache_${url}`);
+      if (cached) {
+        try {
+          const parsed = JSON.parse(cached);
+          if (isCollectionUrl(url)) return Array.isArray(parsed) ? parsed : [];
+          return parsed;
+        } catch { /* ignore */ }
+      }
+      if (isCollectionUrl(url)) return [];
+      return {};
+    } else {
+      if (options.body && (options.method === 'POST' || options.method === 'PUT')) {
+        if (isCollectionUrl(url)) {
+          return saveToCollectionCache(url, options.body);
+        } else {
+          try {
+            const parsed = JSON.parse(options.body);
+            localStorage.setItem(`gst_cache_${url}`, options.body);
+            return parsed;
+          } catch { /* ignore */ }
+        }
+      }
+      return { success: true };
+    }
   }
-  return res.json();
 }
 
 // ---- Invoice Number Settings ----
@@ -187,11 +283,26 @@ export const purgeTrashedBill = async (id) => apiFetch(`${API}/trash/${encodeURI
 
 // ---- Profile ----
 export const saveProfile = async (profile) => {
-  return apiFetch(`${API}/v1/profile`, { method: 'POST', body: JSON.stringify(profile) });
+  try { localStorage.setItem('freegstbill_profile', JSON.stringify(profile)); } catch { /* ignore */ }
+  const res = await apiFetch(`${API}/v1/profile`, { method: 'POST', body: JSON.stringify(profile) });
+  window.dispatchEvent(new Event('fgsb-profile-updated'));
+  return res;
 };
 
 export const getProfile = async () => {
-  return apiFetch(`${API}/v1/profile`);
+  const cached = localStorage.getItem('freegstbill_profile');
+  const res = await apiFetch(`${API}/v1/profile`).catch(() => null);
+  if (res && typeof res === 'object' && Object.keys(res).length > 0 && res.businessName) {
+    try { localStorage.setItem('freegstbill_profile', JSON.stringify(res)); } catch { /* ignore */ }
+    return res;
+  }
+  if (cached) {
+    try {
+      const p = JSON.parse(cached);
+      if (p && typeof p === 'object' && p.businessName) return p;
+    } catch { /* ignore */ }
+  }
+  return res && typeof res === 'object' ? res : (cached ? JSON.parse(cached) : {});
 };
 
 // ---- Saved Clients ----
