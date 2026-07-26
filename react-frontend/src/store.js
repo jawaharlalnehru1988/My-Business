@@ -13,7 +13,8 @@ async function apiFetch(url, options = {}) {
   const isCollectionUrl = (u) => (
     u.includes('/bills') || u.includes('/products') || u.includes('/clients') ||
     u.includes('/expenses') || u.includes('/purchases') || u.includes('/receipts') ||
-    u.includes('/recurring') || u.includes('/templates') || u.includes('/profiles')
+    u.includes('/recurring') || u.includes('/templates') || u.includes('/profiles') ||
+    u.includes('/suppliers')
   );
 
   const saveToCollectionCache = (targetUrl, payload) => {
@@ -318,6 +319,21 @@ export const getAllClients = async () => {
 
 export const deleteClient = async (id) => {
   return apiFetch(`${API}/v1/clients/${encodeURIComponent(id)}`, { method: 'DELETE' });
+};
+
+// ---- Saved Suppliers ----
+export const saveSupplier = async (supplier) => {
+  const res = await apiFetch(`${API}/v1/suppliers`, { method: 'POST', body: JSON.stringify(supplier) });
+  if (res.id) supplier.id = res.id;
+  return supplier;
+};
+
+export const getAllSuppliers = async () => {
+  return apiFetch(`${API}/v1/suppliers`);
+};
+
+export const deleteSupplier = async (id) => {
+  return apiFetch(`${API}/v1/suppliers/${encodeURIComponent(id)}`, { method: 'DELETE' });
 };
 
 // ---- Terms Templates ----

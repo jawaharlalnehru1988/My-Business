@@ -46,9 +46,9 @@ import { toast } from './Toast';
 const TABS = [
   { key: 'calculator', label: 'Regime Calculator', icon: Calculator, help: 'Compare Old vs New (Section 115BAC) — auto-picks the cheaper regime' },
   { key: 'presumptive', label: 'Presumptive (§44AD/ADA)', icon: Briefcase, help: 'Skip full books — declare 6/8% (business) or 50% (professional) of turnover' },
-  { key: 'advance',    label: 'Advance Tax',       icon: Clock,    help: 'Four installment schedule with §234B/C interest calculation' },
-  { key: 'bank',       label: 'Bank Statement Import', icon: Upload, help: 'Upload SBI / HDFC / ICICI / Axis / Kotak / PNB / Yes Bank CSV — auto-categorises' },
-  { key: 'summary',    label: 'ITR Summary',    icon: FileText, help: 'Consolidated view + ITR-4 Filing Summary PDF' },
+  { key: 'advance', label: 'Advance Tax', icon: Clock, help: 'Four installment schedule with §234B/C interest calculation' },
+  { key: 'bank', label: 'Bank Statement Import', icon: Upload, help: 'Upload SBI / HDFC / ICICI / Axis / Kotak / PNB / Yes Bank CSV — auto-categorises' },
+  { key: 'summary', label: 'ITR Summary', icon: FileText, help: 'Consolidated view + ITR-4 Filing Summary PDF' },
 ];
 
 // FY 2024-25 (AY 2025-26) is the assessment year the app targets. The tax
@@ -124,10 +124,10 @@ export default function IncomeTax() {
       return `${y}-${String(y + 1).slice(-2)}` === CURRENT_FY;
     };
     const sales = bills.filter(b => inFY(b.invoiceDate)).reduce((s, b) => s + (Number(b.totalAmount) || 0), 0);
-    const cogs  = purchases.filter(p => inFY(p.date)).reduce((s, p) => s + (Number(p.totalAmount) || 0), 0);
-    const exps  = expenses.filter(e => inFY(e.date))
-                          .filter(e => e.category !== 'Personal / Drawings' && e.category !== 'Asset Purchase')
-                          .reduce((s, e) => s + (Number(e.amount) || 0), 0);
+    const cogs = purchases.filter(p => inFY(p.date)).reduce((s, p) => s + (Number(p.totalAmount) || 0), 0);
+    const exps = expenses.filter(e => inFY(e.date))
+      .filter(e => e.category !== 'Personal / Drawings' && e.category !== 'Asset Purchase')
+      .reduce((s, e) => s + (Number(e.amount) || 0), 0);
     const estimated = Math.max(0, sales - cogs - exps);
     if (estimated > 0) {
       setInputs(prev => ({ ...prev, businessIncome: Math.round(estimated), _autofillHint: true }));
@@ -252,8 +252,8 @@ export default function IncomeTax() {
               housePropertyIncome: Math.max(0, ((prev.housePropertyIncome || 0) + (totals.rent_received || 0) * 0.7)),
               deductions: {
                 ...prev.deductions,
-                '80C':   (Number(prev.deductions?.['80C'])  || 0) + (totals.deduction_80C || 0),
-                '80D':   (Number(prev.deductions?.['80D'])  || 0) + (totals.deduction_80D || 0),
+                '80C': (Number(prev.deductions?.['80C']) || 0) + (totals.deduction_80C || 0),
+                '80D': (Number(prev.deductions?.['80D']) || 0) + (totals.deduction_80D || 0),
                 '80TTA': Math.min(10_000, (Number(prev.deductions?.['80TTA']) || 0) + (totals.interest || 0)),
               },
             }));
@@ -293,9 +293,9 @@ function PresumptiveTab({ presumptiveInputs, setPresumptiveInputs, presumptive, 
         <h3 className="section-title" style={{ marginTop: 0 }}>Section</h3>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.5rem', marginBottom: '1rem' }}>
           {[
-            { key: '44AD',  label: '§44AD',  hint: 'Trading / Retail / Manufacturing' },
+            { key: '44AD', label: '§44AD', hint: 'Trading / Retail / Manufacturing' },
             { key: '44ADA', label: '§44ADA', hint: 'Professionals (CA, doctor, lawyer, consultant)' },
-            { key: '44AE',  label: '§44AE',  hint: 'Transporters (goods carriage owners)' },
+            { key: '44AE', label: '§44AE', hint: 'Transporters (goods carriage owners)' },
           ].map(opt => (
             <button key={opt.key}
               className={`btn ${presumptiveInputs.section === opt.key ? 'btn-primary' : 'btn-secondary'}`}
@@ -1016,17 +1016,17 @@ function defaultInputs() {
 }
 
 const SECTION_DESCRIPTIONS = {
-  '80C':     'PPF · ELSS · LIC · EPF · tuition · home-loan principal · NSC',
+  '80C': 'PPF · ELSS · LIC · EPF · tuition · home-loan principal · NSC',
   '80CCD1B': 'Additional NPS (self)',
-  '80D':     'Health insurance (self + family + parents)',
-  '80TTA':   'Savings-account interest (< 60 yrs)',
-  '80TTB':   'Bank / PO deposit interest (senior citizens)',
-  '80E':     'Education-loan interest — no cap, 8 years',
-  '80G':     'Donations to approved funds',
-  '80GG':    'Rent paid when HRA is not received',
-  '80DDB':   'Specified serious illness',
-  '80U':     'Self-disability',
-  '24b':     'Home-loan interest (self-occupied)',
+  '80D': 'Health insurance (self + family + parents)',
+  '80TTA': 'Savings-account interest (< 60 yrs)',
+  '80TTB': 'Bank / PO deposit interest (senior citizens)',
+  '80E': 'Education-loan interest — no cap, 8 years',
+  '80G': 'Donations to approved funds',
+  '80GG': 'Rent paid when HRA is not received',
+  '80DDB': 'Specified serious illness',
+  '80U': 'Self-disability',
+  '24b': 'Home-loan interest (self-occupied)',
 };
 
 const CATEGORY_LABELS = {

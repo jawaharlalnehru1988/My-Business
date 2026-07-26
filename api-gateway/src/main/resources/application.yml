@@ -16,6 +16,10 @@ spring:
             uri: lb://ACCOUNTING-SERVICE
             predicates:
               - Path=/api/v1/clients/{*path}
+          - id: accounting-service-suppliers
+            uri: lb://ACCOUNTING-SERVICE
+            predicates:
+              - Path=/api/v1/suppliers/{*path}
           - id: accounting-service-bills
             uri: lb://ACCOUNTING-SERVICE
             predicates:

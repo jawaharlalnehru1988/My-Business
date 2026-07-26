@@ -1,11 +1,12 @@
 import { useState, useEffect, lazy, Suspense } from 'react';
 import { ShoppingCart, Plus, Edit3, Trash2, Search, X, Save, Download, Wand2, FileText, Eye } from 'lucide-react';
 import HelpButton from './HelpButton';
-import { getAllPurchases, savePurchase, deletePurchase, getAllProducts, saveProduct } from '../store';
+import { getAllPurchases, savePurchase, deletePurchase, getAllProducts, saveProduct, getAllSuppliers, saveSupplier } from '../store';
 import { formatCurrency, calculateRoundOff, getFYOptions } from '../utils';
 import { getPrintSettings } from '../utils/printSettings';
 import { toast } from './Toast';
 import { confirmAction, promptAction } from './ConfirmModal';
+import SupplierModal from './SupplierModal';
 
 // v1.10.31 — UI-C3: Same accent-color helper as ClientsView so the
 // Purchase Bill PDF header rule + totals line pick up the user's brand.
@@ -133,6 +134,9 @@ export default function PurchaseBills() {
 
   const fyOptions = getFYOptions();
 
+  const [savedSuppliers, setSavedSuppliers] = useState([]);
+  const [showQuickSupplierModal, setShowQuickSupplierModal] = useState(false);
+
   const loadPurchases = async () => {
     try {
       setPurchases(await getAllPurchases());
@@ -141,9 +145,17 @@ export default function PurchaseBills() {
     }
   };
 
+  const loadSuppliers = async () => {
+    try {
+      const sups = await getAllSuppliers();
+      setSavedSuppliers(Array.isArray(sups) ? sups : []);
+    } catch { /* ignore */ }
+  };
+
   useEffect(() => {
     if (fyOptions[0]) setFyFilter(fyOptions[0].value);
     loadPurchases();
+    loadSuppliers();
   }, []);
 
   const filtered = purchases.filter(p => {
@@ -671,14 +683,36 @@ export default function PurchaseBills() {
                 </select>
               </div>
               <div className="form-group">
-                <label className="form-label">Supplier Name *</label>
-                <input type="text" className="form-input" value={form.supplierName}
-                  onChange={e => updateField('supplierName', e.target.value)} placeholder="Vendor / Supplier name" />
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' }}>
+                  <label className="form-label" style={{ margin: 0 }}>Supplier Name *</label>
+                  <button type="button" style={{ background: 'none', border: 'none', color: 'var(--primary)', fontSize: '0.75rem', cursor: 'pointer', fontWeight: 600 }}
+                    onClick={() => setShowQuickSupplierModal(true)}>
+                    + Quick Add
+                  </button>
+                </div>
+                <input type="text" className="form-input" list="pb-suppliers-list" value={form.supplierName}
+                  onChange={e => {
+                    const val = e.target.value;
+                    updateField('supplierName', val);
+                    const matched = savedSuppliers.find(s => s.name && s.name.toLowerCase() === val.toLowerCase());
+                    if (matched) {
+                      if (matched.gstin) updateField('supplierGstin', matched.gstin);
+                      if (matched.address || matched.city || matched.state) {
+                        const fullAddr = [matched.address, matched.city, matched.state, matched.pin].filter(Boolean).join(', ');
+                        updateField('supplierAddress', fullAddr);
+                      }
+                    }
+                  }} placeholder="Vendor / Supplier name" />
+                <datalist id="pb-suppliers-list">
+                  {savedSuppliers.map(s => (
+                    <option key={s.id || s.name} value={s.name}>{s.gstin ? `${s.name} (${s.gstin})` : s.name}</option>
+                  ))}
+                </datalist>
               </div>
               <div className="form-group">
                 <label className="form-label">Supplier GSTIN</label>
                 <input type="text" className="form-input" value={form.supplierGstin}
-                  onChange={e => updateField('supplierGstin', e.target.value)} placeholder="15-digit GSTIN" maxLength={15} />
+                  onChange={e => updateField('supplierGstin', e.target.value.toUpperCase())} placeholder="15-digit GSTIN" maxLength={15} />
               </div>
               {/* v1.10.29 — Supplier address for the PDF. Optional; full width row. */}
               <div className="form-group" style={{ gridColumn: 'span 2' }}>
@@ -890,6 +924,31 @@ export default function PurchaseBills() {
           </div>
         )}
       </div>
+
+      {/* Quick Add Supplier Modal */}
+      <SupplierModal
+        show={showQuickSupplierModal}
+        onClose={() => setShowQuickSupplierModal(false)}
+        onSave={async (newSup) => {
+          try {
+            const saved = await saveSupplier(newSup);
+            toast('Supplier saved successfully', 'success');
+            setShowQuickSupplierModal(false);
+            await loadSuppliers();
+            if (saved?.name) {
+              updateField('supplierName', saved.name);
+              if (saved.gstin) updateField('supplierGstin', saved.gstin);
+              if (saved.address || saved.city || saved.state) {
+                const fullAddr = [saved.address, saved.city, saved.state, saved.pin].filter(Boolean).join(', ');
+                updateField('supplierAddress', fullAddr);
+              }
+            }
+          } catch {
+            toast('Failed to save supplier', 'error');
+          }
+        }}
+        isEditing={false}
+      />
     </div>
   );
 }

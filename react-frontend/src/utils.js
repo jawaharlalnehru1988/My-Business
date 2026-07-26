@@ -1201,7 +1201,9 @@ export const FEATURE_GROUPS = [
     description: 'Clients and product catalog',
     modules: [
       { id: 'clients',   label: 'Clients',   nav: 'clients', core: true },
+      { id: 'suppliers', label: 'Suppliers', nav: 'suppliers', core: true },
       { id: 'inventory', label: 'Products & Services (inventory)', nav: 'inventory', defaultOn: true },
+      { id: 'barcodes',  label: 'Barcode Generator', nav: 'barcodes', core: true },
     ],
   },
   {

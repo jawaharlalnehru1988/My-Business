@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo, lazy, Suspense } from 'react';
-import { Home, FileText, Settings, Plus, Users, Package, BarChart3, Wallet, RefreshCw, Receipt, BookOpen, Moon, Sun, Download, X, ShoppingCart, ChevronDown, Building2, Pencil, HelpCircle, Search, Command, Bell, Calculator, User, LogOut } from 'lucide-react';
+import { Home, FileText, Settings, Plus, Users, Package, BarChart3, Wallet, RefreshCw, Receipt, BookOpen, Moon, Sun, Download, X, ShoppingCart, ChevronDown, Building2, Pencil, HelpCircle, Search, Command, Bell, Calculator, User, LogOut, Barcode } from 'lucide-react';
 import { getAllProfiles, saveProfile, getEnabledModules, getAllBills, getAllProducts, getStockAlertSettings, getAllClients } from './store';
 import { isModuleEnabled, getUpcomingFilings } from './utils';
 // v1.10.4 — Route-level lazy loading. Prior App.jsx synchronously
@@ -24,7 +24,9 @@ import ConfirmModalContainer from './components/ConfirmModal';
 import WelcomeGuide from './components/WelcomeGuide';
 const SettingsView = lazy(() => import('./components/SettingsView'));
 const ClientsView = lazy(() => import('./components/ClientsView'));
+const SuppliersView = lazy(() => import('./components/SuppliersView'));
 const InventoryView = lazy(() => import('./components/InventoryView'));
+const BarcodeGeneratorView = lazy(() => import('./components/BarcodeGeneratorView'));
 const ReportsView = lazy(() => import('./components/ReportsView'));
 const ExpenseTracker = lazy(() => import('./components/ExpenseTracker'));
 const RecurringInvoices = lazy(() => import('./components/RecurringInvoices'));
@@ -75,7 +77,7 @@ function App() {
     try {
       const params = new URLSearchParams(window.location.search);
       const v = params.get('view');
-      const valid = ['dashboard', 'new', 'clients', 'inventory', 'expenses', 'purchases', 'recurring', 'receipts', 'reports', 'filing', 'incometax', 'guide', 'settings'];
+      const valid = ['dashboard', 'new', 'clients', 'suppliers', 'inventory', 'expenses', 'purchases', 'barcodes', 'recurring', 'receipts', 'reports', 'filing', 'incometax', 'guide', 'settings'];
       if (v && valid.includes(v)) {
         // Strip the query string so a refresh doesn't keep snapping back to
         // the shortcut target — only the *first* navigation honours it.
@@ -413,7 +415,7 @@ function App() {
   // If the user just disabled the module backing the current view, kick them to dashboard
   // so they don't land on an empty page after toggling.
   useEffect(() => {
-    const map = { new: 'invoicing', clients: 'clients', inventory: 'inventory', expenses: 'expenses', purchases: 'purchases', recurring: 'recurring', receipts: 'receipts', reports: 'reports', filing: 'gstReturns' };
+    const map = { new: 'invoicing', clients: 'clients', suppliers: 'suppliers', inventory: 'inventory', expenses: 'expenses', purchases: 'purchases', barcodes: 'barcodes', recurring: 'recurring', receipts: 'receipts', reports: 'reports', filing: 'gstReturns' };
     const moduleForView = map[currentView];
     if (moduleForView && !isModuleEnabled(moduleForView, enabledModules)) {
       setCurrentView('dashboard');
@@ -425,9 +427,11 @@ function App() {
     { id: 'dashboard', icon: Home, label: 'Dashboard', module: 'dashboard' },
     { id: 'new', icon: Plus, label: 'New Invoice', onClick: handleNewInvoice, module: 'invoicing' },
     { id: 'clients', icon: Users, label: 'Clients', module: 'clients' },
+    { id: 'suppliers', icon: Building2, label: 'Suppliers', module: 'suppliers' },
     { id: 'inventory', icon: Package, label: 'Products', module: 'inventory' },
     { id: 'expenses', icon: Wallet, label: 'Expenses', module: 'expenses' },
     { id: 'purchases', icon: ShoppingCart, label: 'Purchases', module: 'purchases' },
+    { id: 'barcodes', icon: Barcode, label: 'Barcode Generator', module: 'barcodes' },
     { id: 'recurring', icon: RefreshCw, label: 'Recurring', module: 'recurring' },
     { id: 'receipts', icon: Receipt, label: 'Receipts', module: 'receipts' },
     { id: 'reports', icon: BarChart3, label: 'Reports', module: 'reports' },
@@ -888,6 +892,9 @@ function App() {
         {currentView === 'clients' && (
           <ClientsView onNew={handleNewInvoice} onEdit={handleEditInvoice} onDuplicate={handleDuplicateInvoice} />
         )}
+        {currentView === 'suppliers' && (
+          <SuppliersView onNewPurchase={() => setCurrentView('purchases')} />
+        )}
         {currentView === 'inventory' && (
           <InventoryView />
         )}
@@ -896,6 +903,9 @@ function App() {
         )}
         {currentView === 'purchases' && (
           <PurchaseBills />
+        )}
+        {currentView === 'barcodes' && (
+          <BarcodeGeneratorView />
         )}
         {currentView === 'recurring' && (
           <RecurringInvoices onEdit={handleEditInvoice} />
