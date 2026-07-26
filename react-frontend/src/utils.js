@@ -971,6 +971,8 @@ export const BUILTIN_UNITS = [
   { label: 'Nos',     uqc: 'NOS', kind: 'both' },
   { label: 'Kg',      uqc: 'KGS', kind: 'goods' },
   { label: 'g',       uqc: 'GMS', kind: 'goods' },
+  { label: 'Gms',     uqc: 'GMS', kind: 'goods' },
+  { label: 'Grams',   uqc: 'GMS', kind: 'goods' },
   { label: 'Tonne',   uqc: 'TON', kind: 'goods' },
   { label: 'Ltr',     uqc: 'LTR', kind: 'goods' },
   { label: 'ml',      uqc: 'MLT', kind: 'goods' },

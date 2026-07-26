@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react';
 import { ArrowLeft, Plus, Trash2, Download, UserPlus, Pencil, Settings, ChevronUp, ChevronDown, MessageCircle, Check, Loader, Truck, Printer } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
-import { saveBill, getNextInvoiceNumber, getTermsTemplates, getAllClients, saveClient, getProfile, getAllProducts, saveProduct, getInvoiceDisplayOptions, saveInvoiceDisplayOptions, getAllProfiles, getRegionMode, saveRecurring, getAllBills } from '../store';
+import { saveBill, getNextInvoiceNumber, getTermsTemplates, getAllClients, saveClient, getProfile, getAllProducts, saveProduct, getInvoiceDisplayOptions, saveInvoiceDisplayOptions, getAllProfiles, getRegionMode, saveRecurring, getAllBills, saveSupplier } from '../store';
 import { INVOICE_TYPES, generateEWayBillJSON, formatCurrency, getCountryConfig, getStatesForCountry, getAllUnits, addCustomUnit, removeCustomUnit, calculateRoundOff, getCountriesForRegion, TDS_SECTIONS, TCS_SECTIONS, TERMS_PRESETS, getActiveAccounts, getDefaultAccount, getAccountById, getDefaultUnitForMode, filterUnitsByMode, PAPER_SIZES, getPaperSize, computeInvoiceTotals } from '../utils';
 import { getPrintSettings, savePrintSettings } from '../utils/printSettings';
 import { openWhatsAppShare } from '../utils/share';
@@ -15,6 +15,7 @@ import { suggestGstRate } from '../utils/hsnRates';
 import HelpButton from './HelpButton';
 import { getClientCredit, planCreditApplication } from '../utils/clientCredit';
 import ClientModal from './ClientModal';
+import SupplierModal from './SupplierModal';
 import { toast } from './Toast';
 
 // Rich text editor component that works with contentEditable properly
@@ -413,7 +414,12 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
   const [allProfiles, setAllProfiles] = useState([]);
   const [activeProfile, setActiveProfile] = useState(profileProp);
   const profile = activeProfile || profileProp;
-  const [invoiceType, setInvoiceType] = useState(draft?.invoiceType || 'tax-invoice');
+  const [invoiceType, setInvoiceType] = useState(editingBill?.invoiceType || draft?.invoiceType || 'tax-invoice');
+  useEffect(() => {
+    if (editingBill?.invoiceType) {
+      setInvoiceType(editingBill.invoiceType);
+    }
+  }, [editingBill?.invoiceType]);
   // email/phone/isSEZ must be part of initial state — otherwise the SEZ flag
   // set inside ClientModal is silently discarded on save, and reopening the
   // bill can never restore contact fields even if the saved client has them.
@@ -515,10 +521,40 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
   const [showClientSuggestions, setShowClientSuggestions] = useState(false);
   const [selectedClientId, setSelectedClientId] = useState(null);
   const [showClientModal, setShowClientModal] = useState(false);
+  const [showSupplierModal, setShowSupplierModal] = useState(false);
   const [modalClient, setModalClient] = useState(null);
   const [isEditingClient, setIsEditingClient] = useState(false);
   const clientNameRef = useRef(null);
   const clientSuggestionsRef = useRef(null);
+
+  const handleSupplierModalSave = async (data) => {
+    try {
+      await saveSupplier(data);
+      const clientData = {
+        name: data.name,
+        gstin: data.gstin,
+        phone: data.phone,
+        email: data.email,
+        address: data.address,
+        city: data.city,
+        state: data.state,
+        pin: data.pin,
+        country: data.country || 'India',
+      };
+      await saveClient(clientData);
+      const updatedClients = await getAllClients();
+      setSavedClients(updatedClients);
+
+      setClient(clientData);
+      setSelectedClientId(data.name);
+      setShowSupplierModal(false);
+      setShowClientSuggestions(false);
+      toast(`Party "${data.name}" added successfully!`, 'success');
+    } catch (err) {
+      console.error(err);
+      toast('Failed to save party', 'error');
+    }
+  };
   const [products, setProducts] = useState([]);
   const [productSearch, setProductSearch] = useState({ itemId: null, query: '' });
   const [invoiceOptions, setInvoiceOptions] = useState(() => {
@@ -2964,8 +3000,9 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
             )}
           </div>
 
-          {/* Client Modal */}
+          {/* Client Modal & Supplier / Party Modal */}
           <ClientModal show={showClientModal} onClose={() => setShowClientModal(false)} onSave={handleClientModalSave} client={modalClient} isEditing={isEditingClient} defaultCountry={profile?.country} />
+          <SupplierModal show={showSupplierModal} onClose={() => setShowSupplierModal(false)} onSave={handleSupplierModalSave} defaultCountry={profile?.country} />
 
           {/* Client Details */}
           <div className="glass-panel p-6 mb-6">
@@ -3047,29 +3084,58 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
                     </button>
                   )}
                 </div>
-                {showClientSuggestions && savedClients.length > 0 && (
-                  <div className="client-suggestions" ref={clientSuggestionsRef}>
-                    {filteredClients.length > 0 && filteredClients.map(cli => (
-                      <div key={cli.id} className="client-suggestion-row">
-                        <button type="button" className="client-suggestion-item" onClick={() => selectSavedClient(cli)}>
+                {showClientSuggestions && (
+                  <div className="client-suggestions" ref={clientSuggestionsRef} style={{ width: '100%', minWidth: '340px', boxShadow: '0 10px 25px rgba(0,0,0,0.15)', borderRadius: '8px', padding: '0', background: '#ffffff', zIndex: 100 }}>
+                    {/* Add Party Header Option */}
+                    <button
+                      type="button"
+                      style={{
+                        width: '100%',
+                        textAlign: 'left',
+                        padding: '0.65rem 1rem',
+                        background: '#ffffff',
+                        border: 'none',
+                        borderBottom: '1px solid #f1f5f9',
+                        color: '#2563eb',
+                        fontWeight: 700,
+                        fontSize: '0.88rem',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.4rem',
+                      }}
+                      onClick={() => {
+                        setShowClientSuggestions(false);
+                        setShowSupplierModal(true);
+                      }}
+                    >
+                      <Plus size={16} style={{ border: '2px solid #2563eb', borderRadius: '50%', padding: '1px' }} /> Add Party
+                    </button>
+
+                    {/* Party Header Bar */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.4rem 1rem', fontSize: '0.72rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', background: '#f8fafc' }}>
+                      <span>Customer</span>
+                      <span>Party Balance</span>
+                    </div>
+
+                    {/* Customer Rows */}
+                    {filteredClients.length > 0 ? filteredClients.map(cli => (
+                      <div key={cli.id} className="client-suggestion-row" style={{ padding: '0.55rem 1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #f8fafc' }}>
+                        <button type="button" className="client-suggestion-item" onClick={() => selectSavedClient(cli)} style={{ flex: 1, textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer' }}>
                           <div className="client-suggestion-main">
-                            <strong>{cli.name}</strong>
-                            {(cli.city || cli.address) && <small className="client-suggestion-addr">{cli.city || cli.address.substring(0, 30)}{!cli.city && cli.address.length > 30 ? '...' : ''}</small>}
+                            <strong style={{ fontSize: '0.9rem', color: '#0f172a', display: 'block' }}>{cli.name}</strong>
+                            <span style={{ fontSize: '0.78rem', color: '#64748b' }}>{cli.phone || cli.gstin || 'No contact details'}</span>
                           </div>
-                          <span>{cli.state}{cli.gstin ? ` · ${cli.gstin}` : ''}</span>
                         </button>
-                        <button type="button" className="client-suggestion-edit" onClick={() => { openEditClientModal(cli); setShowClientSuggestions(false); }} title="Edit client">
-                          <Pencil size={12} />
-                        </button>
+                        <div style={{ textAlign: 'right', fontWeight: 700, color: '#059669', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <span>{cli.openingBalance || 0}</span>
+                          <span style={{ background: '#10b981', color: '#fff', fontSize: '0.65rem', padding: '2px 4px', borderRadius: '4px', fontWeight: 800 }}>↙</span>
+                        </div>
                       </div>
-                    ))}
-                    {client.name.trim() && (
-                      <button type="button" className="client-suggestion-save" onClick={openAddClientModal}>
-                        <UserPlus size={14} /> Save "{client.name.trim()}" as new client
-                      </button>
-                    )}
-                    {filteredClients.length === 0 && !client.name.trim() && (
-                      <div className="client-picker-empty">Type to search clients</div>
+                    )) : (
+                      <div style={{ padding: '1rem', textAlign: 'center', color: '#64748b', fontSize: '0.85rem' }}>
+                        No party found. Click <strong>Add Party</strong> above to create one.
+                      </div>
                     )}
                   </div>
                 )}

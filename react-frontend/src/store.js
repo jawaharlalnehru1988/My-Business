@@ -220,13 +220,22 @@ export const getNextInvoiceNumber = async (prefix = 'INV', { peek = false, expli
   const settings = await getInvoiceNumberSettings();
   const key = `counter_${prefix}`;
   let next;
-  if (peek) {
-    const { value: current } = await apiFetch(`${API}/meta/${key}`);
-    const currentNum = Number(current) || (settings.startNumber || 1) - 1;
-    next = currentNum + 1;
-  } else {
-    const inc = await apiFetch(`${API}/meta/${key}/increment`, { method: 'POST', body: JSON.stringify({}) });
-    next = inc.value;
+  try {
+    if (peek) {
+      const res = await apiFetch(`${API}/meta/${key}`);
+      const current = (res && typeof res === 'object' && 'value' in res) ? res.value : res;
+      const currentNum = Number(current) || (settings.startNumber || 1) - 1;
+      next = currentNum + 1;
+    } else {
+      const inc = await apiFetch(`${API}/meta/${key}/increment`, { method: 'POST', body: JSON.stringify({}) });
+      next = (inc && typeof inc === 'object' && 'value' in inc) ? inc.value : Number(inc);
+    }
+  } catch (e) {
+    console.error('Counter fetch error:', e);
+  }
+
+  if (!next || isNaN(next)) {
+    next = settings.startNumber || 1;
   }
 
   // v1.10.10 — When `explicitPrefix` is true, the caller (per-type

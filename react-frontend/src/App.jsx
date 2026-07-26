@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo, lazy, Suspense } from 'react';
-import { Home, FileText, Settings, Plus, Users, Package, BarChart3, Wallet, RefreshCw, Receipt, BookOpen, Moon, Sun, Download, X, ShoppingCart, ChevronDown, Building2, Pencil, HelpCircle, Search, Command, Bell, Calculator, User, LogOut, Barcode } from 'lucide-react';
+import { Home, FileText, Settings, Plus, Users, Package, BarChart3, Wallet, RefreshCw, Receipt, BookOpen, Moon, Sun, Download, X, ShoppingCart, ChevronDown, ChevronUp, Building2, Pencil, HelpCircle, Search, Command, Bell, Calculator, User, LogOut, Barcode, Percent } from 'lucide-react';
 import { getAllProfiles, saveProfile, getEnabledModules, getAllBills, getAllProducts, getStockAlertSettings, getAllClients } from './store';
 import { isModuleEnabled, getUpcomingFilings } from './utils';
 // v1.10.4 — Route-level lazy loading. Prior App.jsx synchronously
@@ -27,6 +27,7 @@ const ClientsView = lazy(() => import('./components/ClientsView'));
 const SuppliersView = lazy(() => import('./components/SuppliersView'));
 const InventoryView = lazy(() => import('./components/InventoryView'));
 const BarcodeGeneratorView = lazy(() => import('./components/BarcodeGeneratorView'));
+const SaleInvoicesView = lazy(() => import('./components/SaleInvoicesView'));
 const ReportsView = lazy(() => import('./components/ReportsView'));
 const ExpenseTracker = lazy(() => import('./components/ExpenseTracker'));
 const RecurringInvoices = lazy(() => import('./components/RecurringInvoices'));
@@ -77,7 +78,7 @@ function App() {
     try {
       const params = new URLSearchParams(window.location.search);
       const v = params.get('view');
-      const valid = ['dashboard', 'new', 'clients', 'suppliers', 'inventory', 'expenses', 'purchases', 'barcodes', 'recurring', 'receipts', 'reports', 'filing', 'incometax', 'guide', 'settings'];
+      const valid = ['dashboard', 'new', 'sale-invoices', 'estimate', 'proforma', 'sale-order', 'delivery-challan', 'credit-note', 'clients', 'suppliers', 'inventory', 'expenses', 'purchases', 'barcodes', 'recurring', 'receipts', 'reports', 'filing', 'incometax', 'guide', 'settings'];
       if (v && valid.includes(v)) {
         // Strip the query string so a refresh doesn't keep snapping back to
         // the shortcut target — only the *first* navigation honours it.
@@ -97,6 +98,15 @@ function App() {
   const [darkMode, setDarkMode] = useState(() => {
     return localStorage.getItem('freegstbill_theme') === 'dark';
   });
+  const [saleMenuOpen, setSaleMenuOpen] = useState(true);
+  const [dashboardTypeFilter, setDashboardTypeFilter] = useState('all');
+  const [receiptAutoOpen, setReceiptAutoOpen] = useState(false);
+  const [lastView, setLastView] = useState('sale-invoices');
+  useEffect(() => {
+    if (currentView && currentView !== 'new') {
+      setLastView(currentView);
+    }
+  }, [currentView]);
   const [showWelcome, setShowWelcome] = useState(false);
   const [showInstallBanner, setShowInstallBanner] = useState(false);
   const [serverDown, setServerDown] = useState(false);
@@ -359,11 +369,63 @@ function App() {
     setProfile(loaded);
   };
 
-  const handleNewInvoice = () => {
+  const handleNewInvoice = (type = 'tax-invoice') => {
     sessionStorage.removeItem('gst_invoiceDraft');
-    setEditingBill(null);
+    setEditingBill({ invoiceType: type || 'tax-invoice' });
     setCurrentView('new');
   };
+
+  const saleSubItems = [
+    {
+      id: 'sale-invoices',
+      label: 'Sale Invoices',
+      type: 'tax-invoice',
+      onView: () => setCurrentView('sale-invoices'),
+      onCreate: () => { handleNewInvoice('tax-invoice'); }
+    },
+    {
+      id: 'estimate',
+      label: 'Estimate/ Quotation',
+      type: 'estimate',
+      onView: () => setCurrentView('estimate'),
+      onCreate: () => { handleNewInvoice('estimate'); }
+    },
+    {
+      id: 'proforma',
+      label: 'Proforma Invoice',
+      type: 'proforma',
+      onView: () => setCurrentView('proforma'),
+      onCreate: () => { handleNewInvoice('proforma'); }
+    },
+    {
+      id: 'payment-in',
+      label: 'Payment-In',
+      type: 'payment-in',
+      onView: () => { setReceiptAutoOpen(false); setCurrentView('receipts'); },
+      onCreate: () => { setReceiptAutoOpen(true); setCurrentView('receipts'); }
+    },
+    {
+      id: 'sale-order',
+      label: 'Sale Order',
+      type: 'sale-order',
+      onView: () => setCurrentView('sale-order'),
+      onCreate: () => { handleNewInvoice('sale-order'); }
+    },
+    {
+      id: 'delivery-challan',
+      label: 'Delivery Challan',
+      type: 'delivery-challan',
+      onView: () => setCurrentView('delivery-challan'),
+      onCreate: () => { handleNewInvoice('delivery-challan'); }
+    },
+    {
+      id: 'sale-return',
+      label: 'Sale Return/ Credit',
+      type: 'credit-note',
+      onView: () => setCurrentView('credit-note'),
+      onCreate: () => { handleNewInvoice('credit-note'); }
+    },
+  ];
 
   const handleEditInvoice = (bill) => {
     sessionStorage.removeItem('gst_invoiceDraft');
@@ -425,7 +487,6 @@ function App() {
 
   const navItems = [
     { id: 'dashboard', icon: Home, label: 'Dashboard', module: 'dashboard' },
-    { id: 'new', icon: Plus, label: 'New Invoice', onClick: handleNewInvoice, module: 'invoicing' },
     { id: 'clients', icon: Users, label: 'Clients', module: 'clients' },
     { id: 'suppliers', icon: Building2, label: 'Suppliers', module: 'suppliers' },
     { id: 'inventory', icon: Package, label: 'Products', module: 'inventory' },
@@ -734,7 +795,93 @@ function App() {
         </div>
 
         <nav className="sidebar-nav">
-          {navItems.map(item => (
+          {/* Dashboard Item */}
+          <button
+            className={`nav-btn ${currentView === 'dashboard' ? 'nav-btn-active' : ''}`}
+            onClick={() => { setDashboardTypeFilter('all'); setCurrentView('dashboard'); }}
+          >
+            <Home size={18} /> Dashboard
+          </button>
+
+          {/* Sale Collapsible Group */}
+          <div style={{ marginBottom: '0.25rem' }}>
+            <button
+              className="nav-btn"
+              onClick={() => setSaleMenuOpen(v => !v)}
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', paddingRight: '0.75rem' }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                <Percent size={18} />
+                <span style={{ fontWeight: 600 }}>Sale</span>
+              </div>
+              {saleMenuOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+            </button>
+
+            {saleMenuOpen && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', paddingLeft: '0.75rem', marginTop: '3px' }}>
+                {saleSubItems.map(sub => {
+                  const isSubActive =
+                    currentView === sub.id ||
+                    (sub.id === 'sale-invoices' && (currentView === 'sale-invoices' || (currentView === 'new' && (editingBill?.invoiceType === 'tax-invoice' || !editingBill?.invoiceType)))) ||
+                    (sub.id === 'estimate' && (currentView === 'estimate' || (currentView === 'new' && editingBill?.invoiceType === 'estimate'))) ||
+                    (sub.id === 'proforma' && (currentView === 'proforma' || (currentView === 'new' && editingBill?.invoiceType === 'proforma'))) ||
+                    (sub.id === 'sale-order' && (currentView === 'sale-order' || (currentView === 'new' && editingBill?.invoiceType === 'sale-order'))) ||
+                    (sub.id === 'delivery-challan' && (currentView === 'delivery-challan' || (currentView === 'new' && editingBill?.invoiceType === 'delivery-challan'))) ||
+                    (sub.id === 'sale-return' && (currentView === 'credit-note' || (currentView === 'new' && editingBill?.invoiceType === 'credit-note'))) ||
+                    (sub.id === 'payment-in' && currentView === 'receipts');
+
+                  return (
+                    <div
+                      key={sub.id}
+                      className={`nav-sub-btn ${isSubActive ? 'nav-sub-btn-active' : ''}`}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justify: 'space-between',
+                        padding: '0.45rem 0.65rem',
+                        borderRadius: '6px',
+                        fontSize: '0.84rem',
+                        color: isSubActive ? '#ffffff' : 'var(--text-subtle, #cbd5e1)',
+                        background: isSubActive ? '#2563eb' : 'transparent',
+                        fontWeight: isSubActive ? 700 : 500,
+                        cursor: 'pointer',
+                        transition: 'background 0.2s, color 0.2s',
+                        boxShadow: isSubActive ? '0 1px 3px rgba(37, 99, 235, 0.4)' : 'none',
+                      }}
+                      onClick={sub.onView}
+                    >
+                      <span>{sub.label}</span>
+                      <button
+                        type="button"
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: 'inherit',
+                          cursor: 'pointer',
+                          padding: '2px 4px',
+                          borderRadius: '3px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justify: 'center',
+                          opacity: isSubActive ? 1 : 0.75,
+                        }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          sub.onCreate();
+                        }}
+                        title={`Create new ${sub.label}`}
+                      >
+                        <Plus size={15} />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Remaining Nav Items */}
+          {navItems.filter(item => item.id !== 'dashboard').map(item => (
             <button
               key={item.id}
               className={`nav-btn ${currentView === item.id ? 'nav-btn-active' : ''}`}
@@ -878,17 +1025,35 @@ function App() {
         </header>
 
         {currentView === 'dashboard' && (
-          <Dashboard onNew={handleNewInvoice} onEdit={handleEditInvoice} onDuplicate={handleDuplicateInvoice} onConvert={handleConvertToInvoice} />
+          <Dashboard onNew={handleNewInvoice} onEdit={handleEditInvoice} onDuplicate={handleDuplicateInvoice} onConvert={handleConvertToInvoice} initialTypeFilter={dashboardTypeFilter} />
         )}
         {currentView === 'new' && (
           <InvoiceGenerator
-            onBack={() => { setEditingBill(null); setCurrentView('dashboard'); }}
+            onBack={() => { setEditingBill(null); setCurrentView(lastView || 'sale-invoices'); }}
             profile={profile} editingBill={editingBill}
           />
         )}
         {/* v1.10.4 — All lazy views under one Suspense boundary. Only the
              matched view's chunk actually loads; others stay unfetched. */}
         <Suspense fallback={<ViewLoading />}>
+        {currentView === 'sale-invoices' && (
+          <SaleInvoicesView docType="tax-invoice" onNew={handleNewInvoice} onEdit={handleEditInvoice} onDuplicate={handleDuplicateInvoice} onConvert={handleConvertToInvoice} />
+        )}
+        {currentView === 'estimate' && (
+          <SaleInvoicesView docType="estimate" onNew={handleNewInvoice} onEdit={handleEditInvoice} onDuplicate={handleDuplicateInvoice} onConvert={handleConvertToInvoice} />
+        )}
+        {currentView === 'proforma' && (
+          <SaleInvoicesView docType="proforma" onNew={handleNewInvoice} onEdit={handleEditInvoice} onDuplicate={handleDuplicateInvoice} onConvert={handleConvertToInvoice} />
+        )}
+        {currentView === 'sale-order' && (
+          <SaleInvoicesView docType="sale-order" onNew={handleNewInvoice} onEdit={handleEditInvoice} onDuplicate={handleDuplicateInvoice} onConvert={handleConvertToInvoice} />
+        )}
+        {currentView === 'delivery-challan' && (
+          <SaleInvoicesView docType="delivery-challan" onNew={handleNewInvoice} onEdit={handleEditInvoice} onDuplicate={handleDuplicateInvoice} onConvert={handleConvertToInvoice} />
+        )}
+        {currentView === 'credit-note' && (
+          <SaleInvoicesView docType="credit-note" onNew={handleNewInvoice} onEdit={handleEditInvoice} onDuplicate={handleDuplicateInvoice} onConvert={handleConvertToInvoice} />
+        )}
         {currentView === 'clients' && (
           <ClientsView onNew={handleNewInvoice} onEdit={handleEditInvoice} onDuplicate={handleDuplicateInvoice} />
         )}
@@ -911,7 +1076,7 @@ function App() {
           <RecurringInvoices onEdit={handleEditInvoice} />
         )}
         {currentView === 'receipts' && (
-          <ReceiptVoucher />
+          <ReceiptVoucher autoOpenNew={receiptAutoOpen} />
         )}
         {currentView === 'reports' && (
           <ReportsView />

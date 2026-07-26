@@ -19,7 +19,7 @@ const emptyForm = {
   note: '',
 };
 
-export default function ReceiptVoucher() {
+export default function ReceiptVoucher({ autoOpenNew }) {
   const [receipts, setReceipts] = useState([]);
   const [bills, setBills] = useState([]);
   const [profile, setProfile] = useState({});
@@ -43,7 +43,10 @@ export default function ReceiptVoucher() {
 
   useEffect(() => {
     loadData();
-  }, []);
+    if (autoOpenNew) {
+      openAdd();
+    }
+  }, [autoOpenNew]);
 
   // Peek at the next receipt number using the SAME atomic counter that
   // invoice numbers use. Pre-v1.6.8 this counted `receipts.length + 1`

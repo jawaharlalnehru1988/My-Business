@@ -142,16 +142,20 @@ function ReceiptModal({ target, onClose }) {
   );
 }
 
-export default function Dashboard({ onNew, onEdit, onDuplicate, onConvert }) {
+export default function Dashboard({ onNew, onEdit, onDuplicate, onConvert, initialTypeFilter }) {
   const [bills, setBills] = useState([]);
   const [filtered, setFiltered] = useState([]);
   const [stats, setStats] = useState({ byCurrency: {}, count: 0 });
   const [search, setSearch] = useState('');
-  const [typeFilter, setTypeFilter] = useState('all');
+  const [typeFilter, setTypeFilter] = useState(initialTypeFilter || 'all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [fyFilter, setFyFilter] = useState('all');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
+
+  useEffect(() => {
+    if (initialTypeFilter) setTypeFilter(initialTypeFilter);
+  }, [initialTypeFilter]);
   // Bulk-selection state. Stores a Set of bill IDs (not the bills themselves)
   // so we don't hold stale references when the underlying bill is edited
   // elsewhere. Cleared whenever filters change so the user doesn't accidentally
