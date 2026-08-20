@@ -191,6 +191,9 @@ export default function Dashboard({ onNew, onEdit, onDuplicate, onConvert, initi
   const [profile, setProfileState] = useState(null);
   const [clients, setClients] = useState([]);
   const [lowStockProducts, setLowStockProducts] = useState([]);
+  const [allProducts, setAllProducts] = useState([]);
+  const [topProducts, setTopProducts] = useState([]);
+  const [inventoryValuation, setInventoryValuation] = useState(0);
 
   // v1.10.4 — audit M14. getFYOptions is date-based (only changes across
   // April-1 boundary); memoize with an empty dep so we run it once per
@@ -220,14 +223,26 @@ export default function Dashboard({ onNew, onEdit, onDuplicate, onConvert, initi
 
       // Group totals by currency
       const byCurrency = {};
+      const productSales = {};
       for (const b of data) {
         const cur = b.currency || b.data?.invoiceOptions?.currency || 'INR';
         if (!byCurrency[cur]) byCurrency[cur] = { total: 0, tax: 0, unpaid: 0 };
         byCurrency[cur].total += b.totalAmount || 0;
         byCurrency[cur].tax += b.totalTaxAmount || 0;
         if (b.status !== 'paid') byCurrency[cur].unpaid += (b.totalAmount || 0) - (b.paidAmount || 0);
+
+        if (b.invoiceType !== 'proforma' && b.data?.items) {
+           for (const item of b.data.items) {
+               if (item.name) {
+                   productSales[item.name] = (productSales[item.name] || 0) + Number(item.quantity || 0);
+               }
+           }
+        }
       }
       setStats({ byCurrency, count: data.length });
+      
+      const sortedProducts = Object.entries(productSales).map(([name, qty]) => ({ name, qty })).sort((a, b) => b.qty - a.qty).slice(0, 5);
+      setTopProducts(sortedProducts);
     } catch {
       toast('Failed to load invoices', 'error');
     }
@@ -243,6 +258,10 @@ export default function Dashboard({ onNew, onEdit, onDuplicate, onConvert, initi
       getAllProducts().catch(() => []),
       getStockAlertSettings().catch(() => ({ enabled: true, threshold: 5 })),
     ]).then(([prods, cfg]) => {
+      setAllProducts(prods);
+      const val = prods.reduce((sum, p) => sum + (p.stock || 0) * (p.weightedAverageCost || p.purchasePrice || p.rate || 0), 0);
+      setInventoryValuation(val);
+      
       if (cfg?.enabled === false) { setLowStockProducts([]); return; }
       const threshold = Number(cfg?.threshold ?? 5);
       setLowStockProducts(prods.filter(p => (p.stock ?? 0) <= threshold));
@@ -1060,33 +1079,60 @@ export default function Dashboard({ onNew, onEdit, onDuplicate, onConvert, initi
         </div>
       </div>
 
-      {/* Low Stock Alerts */}
-      {lowStockProducts.length > 0 && (
-        <div className="glass-panel" style={{ marginBottom: '1.25rem', padding: '1rem 1.25rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
-            <Package size={18} style={{ color: '#d97706' }} />
-            <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, color: '#d97706' }}>
-              Low Stock Alert ({lowStockProducts.length} item{lowStockProducts.length > 1 ? 's' : ''})
-            </h3>
+      <h3 className="section-title" style={{ marginTop: '2rem', marginBottom: '1rem' }}>Inventory Overview</h3>
+      <div className="grid grid-cols-3 gap-6 mb-6">
+        {/* Inventory Valuation */}
+        <div className="stat-card" style={{ display: 'block' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
+            <div className="stat-icon stat-icon-blue"><Package size={22} /></div>
+            <p className="stat-label" style={{ margin: 0 }}>Total Valuation</p>
           </div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-            {lowStockProducts.map(p => (
-              <div key={p.id} style={{
-                padding: '0.4rem 0.75rem', borderRadius: 6, fontSize: '0.8rem',
-                background: (p.stock ?? 0) <= 0 ? '#fef2f2' : '#fffbeb',
-                border: `1px solid ${(p.stock ?? 0) <= 0 ? '#fecaca' : '#fde68a'}`,
-                color: (p.stock ?? 0) <= 0 ? '#dc2626' : '#d97706',
-              }}>
-                <strong>{p.name}</strong>
-                {p.hsn ? <span className="text-muted" style={{ marginLeft: 4, fontSize: '0.72rem' }}>({p.hsn})</span> : null}
-                <span style={{ marginLeft: 6, fontWeight: 700 }}>
-                  {(p.stock ?? 0) <= 0 ? 'Out of Stock' : `Stock: ${p.stock}`}
-                </span>
-              </div>
-            ))}
+          <div className="stat-value" style={{ fontSize: '1.5rem' }}>
+            {formatCurrency(inventoryValuation, profileState?.currency || 'INR')}
           </div>
         </div>
-      )}
+
+        {/* Top Selling Products */}
+        <div className="stat-card" style={{ display: 'block' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
+            <div className="stat-icon stat-icon-green"><TrendingUp size={22} /></div>
+            <p className="stat-label" style={{ margin: 0 }}>Top Selling (By Qty)</p>
+          </div>
+          {topProducts.length > 0 ? (
+            <ul style={{ listStyle: 'none', padding: 0, margin: 0, fontSize: '0.85rem' }}>
+              {topProducts.map((p, idx) => (
+                <li key={idx} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.2rem 0', borderBottom: idx < topProducts.length - 1 ? '1px solid #f1f5f9' : 'none' }}>
+                  <span style={{ color: '#475569' }}>{p.name}</span>
+                  <span style={{ fontWeight: 600 }}>{p.qty}</span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-muted" style={{ fontSize: '0.85rem' }}>No sales data yet.</p>
+          )}
+        </div>
+
+        {/* Low Stock Alerts */}
+        <div className="stat-card" style={{ display: 'block' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
+            <div className="stat-icon stat-icon-amber"><AlertTriangle size={22} /></div>
+            <p className="stat-label" style={{ margin: 0 }}>Low Stock Alerts</p>
+          </div>
+          {lowStockProducts.length > 0 ? (
+            <ul style={{ listStyle: 'none', padding: 0, margin: 0, fontSize: '0.85rem', maxHeight: '100px', overflowY: 'auto' }}>
+              {lowStockProducts.map(p => (
+                <li key={p.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.2rem 0', borderBottom: '1px solid #f1f5f9' }}>
+                  <span style={{ color: '#475569' }}>{p.name}</span>
+                  <span style={{ fontWeight: 600, color: '#dc2626' }}>{p.stock || 0} left</span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-muted" style={{ fontSize: '0.85rem' }}>All stock levels healthy.</p>
+          )}
+        </div>
+      </div>
+
 
       <div className="glass-panel">
         <div className="table-header"><h3>Invoices</h3></div>

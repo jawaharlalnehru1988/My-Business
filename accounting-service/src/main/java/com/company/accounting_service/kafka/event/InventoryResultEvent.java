@@ -1,4 +1,4 @@
-package com.company.inventory_service.kafka.event;
+package com.company.accounting_service.kafka.event;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -10,11 +10,9 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class InventoryResultEvent {
-    private String transactionId; // Corresponds to SaleOrder invoiceNumber
+    private String transactionId; 
     private String status; // SUCCESS or FAILED
-    private String message; // Error details if failed
-    private java.math.BigDecimal totalCogs; // Cost of Goods Sold for the transaction
+    private String message; 
+    private java.math.BigDecimal totalCogs; 
     private Long tenantId;
 }
-
-

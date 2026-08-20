@@ -1,4 +1,4 @@
-package com.company.inventory_service.kafka.event;
+package com.company.accounting_service.kafka.event;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -12,8 +12,8 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 public class InventoryEvent {
-    private String transactionId; // e.g. SaleOrder invoiceNumber
-    private String eventType; // e.g. DEDUCT_STOCK
+    private String transactionId;
+    private String eventType; // e.g. ADD_STOCK
     private Long tenantId;
     private List<StockItem> items;
     private Long warehouseId;
@@ -28,5 +28,3 @@ public class InventoryEvent {
         private BigDecimal unitCost;
     }
 }
-
-

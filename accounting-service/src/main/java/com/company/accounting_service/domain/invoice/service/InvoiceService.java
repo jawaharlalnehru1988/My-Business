@@ -16,12 +16,16 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import com.company.accounting_service.kafka.event.InventoryEvent;
+import com.company.accounting_service.kafka.producer.AccountingInventoryEventProducer;
+
 @Service
 @RequiredArgsConstructor
 public class InvoiceService {
 
     private final InvoiceRepository invoiceRepository;
     private final ObjectMapper objectMapper;
+    private final AccountingInventoryEventProducer inventoryEventProducer;
 
     @Transactional(readOnly = true)
     public List<InvoiceDTO> getAllInvoices() {
@@ -80,6 +84,23 @@ public class InvoiceService {
         }
 
         invoice = invoiceRepository.save(invoice);
+        
+        // Publish DEDUCT_STOCK event for standard fulfillment integration
+        if (invoice.getItems() != null && !invoice.getItems().isEmpty()) {
+            InventoryEvent event = InventoryEvent.builder()
+                    .transactionId("INVOICE_" + invoice.getId())
+                    .eventType("DEDUCT_STOCK")
+                    .warehouseId(1L) // Assuming warehouseId = 1 for now
+                    .items(invoice.getItems().stream().map(item -> 
+                            InventoryEvent.StockItem.builder()
+                                    .productId(item.getProductId() != null ? item.getProductId() : 1L)
+                                    .quantity(item.getQuantity())
+                                    .build()
+                    ).collect(Collectors.toList()))
+                    .build();
+            inventoryEventProducer.publishEvent(event);
+        }
+        
         return mapToDTO(invoice);
     }
 

@@ -37,8 +37,9 @@ public class InventoryController {
             @RequestParam Long productId,
             @RequestParam Long warehouseId,
             @RequestParam BigDecimal quantity,
-            @RequestParam String type) {
-        StockTransaction tx = inventoryService.adjustStock(productId, warehouseId, quantity, type);
+            @RequestParam String type,
+            @RequestParam(required = false) BigDecimal unitCost) {
+        StockTransaction tx = inventoryService.adjustStock(productId, warehouseId, quantity, type, unitCost);
         com.company.inventory_service.domain.inventory.dto.StockTransactionDto dto = com.company.inventory_service.domain.inventory.dto.StockTransactionDto.builder()
                 .id(tx.getId())
                 .product(com.company.inventory_service.domain.inventory.dto.StockTransactionDto.ProductInfo.builder()

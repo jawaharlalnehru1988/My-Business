@@ -375,6 +375,14 @@ export const deleteProduct = async (id) => {
   return apiFetch(`${API}/v1/products/${encodeURIComponent(id)}`, { method: 'DELETE' });
 };
 
+export const getAllWarehouses = async () => {
+  return apiFetch(`${API}/v1/inventory/warehouses`);
+};
+
+export const reconcileStock = async (productId, warehouseId, observedQuantity) => {
+  return apiFetch(`${API}/v1/inventory/adjustments/reconcile?productId=${productId}&warehouseId=${warehouseId}&observedQuantity=${observedQuantity}`, { method: 'POST' });
+};
+
 // ---- Expenses ----
 export const getAllExpenses = async () => {
   return apiFetch(`${API}/v1/expenses`);

@@ -11,11 +11,15 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import com.company.accounting_service.kafka.event.InventoryEvent;
+import com.company.accounting_service.kafka.producer.AccountingInventoryEventProducer;
+
 @Service
 @RequiredArgsConstructor
 public class PurchaseService {
 
     private final PurchaseRepository purchaseRepository;
+    private final AccountingInventoryEventProducer inventoryEventProducer;
 
     @Transactional(readOnly = true)
     public List<PurchaseDTO> getAllPurchases() {
@@ -59,6 +63,25 @@ public class PurchaseService {
         }
 
         purchase = purchaseRepository.save(purchase);
+        
+        // Publish inventory event if payment status implies received, or just for all purchases for simplicity
+        // For physical products standard accounting, typically a GRN is required, but we will publish it on save
+        InventoryEvent event = InventoryEvent.builder()
+                .transactionId("PURCHASE_" + purchase.getId())
+                .eventType("ADD_STOCK")
+                // Assuming warehouseId = 1 for now, in a real app this would be in DTO
+                .warehouseId(1L)
+                .items(purchase.getItems().stream().map(item -> 
+                        InventoryEvent.StockItem.builder()
+                                // Product mapping would normally need productId in DTO. Using hash/ID placeholder for demo.
+                                .productId(1L) // Hardcoded 1L, would need productId in PurchaseLineItem
+                                .quantity(item.getQuantity())
+                                .unitCost(item.getRate())
+                                .build()
+                ).collect(Collectors.toList()))
+                .build();
+        inventoryEventProducer.publishEvent(event);
+        
         return mapToDTO(purchase);
     }
 

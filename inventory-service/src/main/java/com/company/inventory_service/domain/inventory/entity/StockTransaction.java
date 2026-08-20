@@ -31,6 +31,9 @@ public class StockTransaction {
     @Column(name = "transaction_type", nullable = false, length = 50)
     private String transactionType;
 
+    @Column(name = "unit_cost", precision = 15, scale = 2)
+    private BigDecimal unitCost;
+
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 }

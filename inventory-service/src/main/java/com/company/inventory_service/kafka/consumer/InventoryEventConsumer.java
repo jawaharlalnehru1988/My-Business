@@ -33,17 +33,35 @@ public class InventoryEventConsumer {
         try {
             if ("DEDUCT_STOCK".equals(event.getEventType())) {
                 // Perform deductions for each item
+                java.math.BigDecimal totalCogs = java.math.BigDecimal.ZERO;
                 for (InventoryEvent.StockItem item : event.getItems()) {
                     // We negate the quantity because adjustStock expects negative for OUT
-                    inventoryService.adjustStock(
+                    var tx = inventoryService.adjustStock(
                             item.getProductId(),
                             event.getWarehouseId(),
                             item.getQuantity().negate(),
-                            "SALE"
+                            "SALE",
+                            null // unitCost not needed for standard sales deduction, service uses WAC
                     );
+                    if (tx.getUnitCost() != null) {
+                        totalCogs = totalCogs.add(tx.getUnitCost().multiply(item.getQuantity()));
+                    }
                 }
                 result.setStatus("SUCCESS");
                 result.setMessage("Stock successfully deducted");
+                result.setTotalCogs(totalCogs);
+            } else if ("ADD_STOCK".equals(event.getEventType())) {
+                for (InventoryEvent.StockItem item : event.getItems()) {
+                    inventoryService.adjustStock(
+                            item.getProductId(),
+                            event.getWarehouseId(),
+                            item.getQuantity(),
+                            "PURCHASE",
+                            item.getUnitCost()
+                    );
+                }
+                result.setStatus("SUCCESS");
+                result.setMessage("Stock successfully added");
             } else {
                 result.setStatus("FAILED");
                 result.setMessage("Unknown event type");

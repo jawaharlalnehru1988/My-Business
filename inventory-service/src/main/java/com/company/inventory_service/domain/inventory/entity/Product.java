@@ -40,6 +40,9 @@ public class Product {
     @Column(precision = 15, scale = 3)
     private BigDecimal stock;
 
+    @Column(name = "weighted_average_cost", precision = 15, scale = 2)
+    private BigDecimal weightedAverageCost;
+
     @Column(length = 1000)
     private String description;
 }
