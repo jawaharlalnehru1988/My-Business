@@ -91,6 +91,7 @@
     "bundle:tesseract": "node scripts/bundle-tesseract-assets.mjs"
   },
   "dependencies": {
+    "@react-oauth/google": "^0.13.5",
     "cors": "^2.8.6",
     "dompurify": "^3.3.3",
     "express": "^5.2.1",

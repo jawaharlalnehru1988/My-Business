@@ -43,7 +43,7 @@ public class InventoryEventConsumer {
                             "SALE",
                             null // unitCost not needed for standard sales deduction, service uses WAC
                     );
-                    if (tx.getUnitCost() != null) {
+                    if (tx != null && tx.getUnitCost() != null) {
                         totalCogs = totalCogs.add(tx.getUnitCost().multiply(item.getQuantity()));
                     }
                 }

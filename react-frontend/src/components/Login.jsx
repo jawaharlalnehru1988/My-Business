@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { LogIn, UserPlus, Eye, EyeOff } from 'lucide-react';
 import { toast } from './Toast';
+import { GoogleLogin } from '@react-oauth/google';
 
 export default function Login({ onLoginSuccess }) {
   const [isSignUp, setIsSignUp] = useState(false);
@@ -12,6 +13,29 @@ export default function Login({ onLoginSuccess }) {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  const handleGoogleSuccess = async (credentialResponse) => {
+    setLoading(true);
+    setError('');
+    try {
+      const res = await fetch('/api/v1/auth/google', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ credential: credentialResponse.credential })
+      });
+      if (!res.ok) throw new Error('Google authentication failed');
+      const data = await res.json();
+      localStorage.setItem('jwt_token', data.token);
+      localStorage.setItem('tenantId', data.tenantId || '');
+      localStorage.setItem('businessName', data.businessName || '');
+      toast('Signed in with Google successfully!', 'success');
+      onLoginSuccess();
+    } catch (err) {
+      setError(err.message || 'Google Login failed.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -139,6 +163,23 @@ export default function Login({ onLoginSuccess }) {
           <p style={{ color: 'var(--text-muted, #64748b)', fontSize: '0.9rem', margin: 0 }}>
             {isSignUp ? 'Create a new business client account' : 'Sign in to access your business console'}
           </p>
+        </div>
+
+        {/* Google Login */}
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1.5rem' }}>
+          <GoogleLogin
+            onSuccess={handleGoogleSuccess}
+            onError={() => {
+              setError('Google Login Failed');
+            }}
+            useOneTap
+          />
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', margin: '1.5rem 0' }}>
+          <div style={{ flex: 1, height: '1px', background: '#e2e8f0' }}></div>
+          <span style={{ padding: '0 10px', color: '#94a3b8', fontSize: '0.85rem' }}>OR</span>
+          <div style={{ flex: 1, height: '1px', background: '#e2e8f0' }}></div>
         </div>
 
         {/* Tab Switcher */}

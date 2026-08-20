@@ -19,6 +19,7 @@ import { isModuleEnabled, getUpcomingFilings } from './utils';
 import Dashboard from './components/Dashboard';
 import InvoiceGenerator from './components/InvoiceGenerator';
 import SetupWizard from './components/SetupWizard';
+import BusinessSetupWizard from './components/BusinessSetupWizard';
 import ToastContainer from './components/Toast';
 import ConfirmModalContainer from './components/ConfirmModal';
 import WelcomeGuide from './components/WelcomeGuide';
@@ -70,6 +71,9 @@ function App() {
   // v1.9.3 — Setup Wizard shown on first-run (before onboardingComplete = true)
   const [showWizard, setShowWizard] = useState(() => {
     try { return !getPrintSettings().onboardingComplete; } catch { return false; }
+  });
+  const [showBusinessWizard, setShowBusinessWizard] = useState(() => {
+    return !!localStorage.getItem('jwt_token') && (!localStorage.getItem('tenantId') || localStorage.getItem('tenantId') === 'null');
   });
   const [currentView, setCurrentView] = useState(() => {
     // PWA manifest "shortcuts" deep-link in via ?view=X (e.g. right-clicking
@@ -726,7 +730,8 @@ function App() {
 
   return (
     <div className="app-layout">
-      {showWizard && <SetupWizard onClose={() => setShowWizard(false)} />}
+      {showBusinessWizard && <BusinessSetupWizard onComplete={() => setShowBusinessWizard(false)} />}
+      {showWizard && !showBusinessWizard && <SetupWizard onClose={() => setShowWizard(false)} />}
       {showResumeSetupPill && (
         <button type="button"
           onClick={() => setShowWizard(true)}

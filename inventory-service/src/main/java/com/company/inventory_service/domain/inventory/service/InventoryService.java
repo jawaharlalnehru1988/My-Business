@@ -41,6 +41,10 @@ public class InventoryService {
         com.company.inventory_service.domain.inventory.entity.Product product = productRepository.findById(productId)
                 .orElseThrow(() -> new RuntimeException("Product not found"));
 
+        if ("SERVICE".equals(product.getType())) {
+            return null; // Skip stock adjustments for services
+        }
+
         // Update product stock
         BigDecimal currentStock = product.getStock() != null ? product.getStock() : BigDecimal.ZERO;
         BigDecimal currentWac = product.getWeightedAverageCost() != null ? product.getWeightedAverageCost() : BigDecimal.ZERO;

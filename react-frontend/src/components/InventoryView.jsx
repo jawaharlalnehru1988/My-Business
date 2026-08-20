@@ -12,7 +12,7 @@ import { confirmAction } from './ConfirmModal';
 // still gets a valid number, but the form no longer edits it directly —
 // dead state removed for clarity.
 const emptyForm = {
-  name: '', sku: '', hsn: '', purchasePrice: '', sellingPrice: '', taxPercent: '', unit: 'Nos', stock: '', description: '',
+  name: '', sku: '', hsn: '', purchasePrice: '', sellingPrice: '', taxPercent: '', unit: 'Nos', stock: '', description: '', type: 'PHYSICAL',
 };
 
 export default function InventoryView() {
@@ -378,6 +378,19 @@ export default function InventoryView() {
                 <input type="text" className="form-input" value={form.name}
                   onChange={e => updateField('name', e.target.value)} placeholder="e.g. Web Development" />
               </div>
+              <div className="form-group" style={{ gridColumn: 'span 2' }}>
+                <label className="form-label">Item Type</label>
+                <div style={{ display: 'flex', gap: '1rem', marginTop: '0.2rem' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', fontSize: '0.9rem' }}>
+                    <input type="radio" name="itemType" checked={form.type === 'PHYSICAL'} onChange={() => updateField('type', 'PHYSICAL')} />
+                    Physical Product
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', fontSize: '0.9rem' }}>
+                    <input type="radio" name="itemType" checked={form.type === 'SERVICE'} onChange={() => updateField('type', 'SERVICE')} />
+                    Service
+                  </label>
+                </div>
+              </div>
               <div className="form-group">
                 <label className="form-label">SKU / QR / Barcode</label>
                 <div style={{ display: 'flex', gap: '0.4rem' }}>
@@ -423,11 +436,13 @@ export default function InventoryView() {
                   {units.map(u => <option key={u.label} value={u.label}>{u.label}{u.custom ? ' ★' : ''}</option>)}
                 </select>
               </div>
-              <div className="form-group">
-                <label className="form-label">Stock Quantity</label>
-                <input type="number" className="form-input" value={form.stock}
-                  onChange={e => updateField('stock', e.target.value)} placeholder="0" min="0" />
-              </div>
+              {form.type === 'PHYSICAL' && (
+                <div className="form-group">
+                  <label className="form-label">Stock Quantity</label>
+                  <input type="number" className="form-input" value={form.stock}
+                    onChange={e => updateField('stock', e.target.value)} placeholder="0" min="0" />
+                </div>
+              )}
               <div className="form-group" style={{ gridColumn: 'span 2' }}>
                 <label className="form-label">Description (optional)</label>
                 <input type="text" className="form-input" value={form.description}
@@ -480,7 +495,9 @@ export default function InventoryView() {
                     <td>{product.taxPercent ? `${product.taxPercent}%` : '-'}</td>
                     <td className="text-muted">{product.unit || 'Nos'}</td>
                     <td>
-                      {(product.stock ?? 0) <= 0 ? (
+                      {product.type === 'SERVICE' ? (
+                        <span style={{ padding: '2px 6px', background: '#e0e7ff', color: '#4338ca', borderRadius: '4px', fontSize: '0.8rem', fontWeight: 600 }}>Service</span>
+                      ) : (product.stock ?? 0) <= 0 ? (
                         <span style={{ color: '#dc2626', fontWeight: 600 }}>Out of Stock</span>
                       ) : (stockAlerts.enabled !== false && (product.stock ?? 0) <= Number(stockAlerts.threshold ?? 5)) ? (
                         <span style={{ color: '#d97706', fontWeight: 600 }}>{product.stock}</span>

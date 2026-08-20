@@ -25,4 +25,15 @@ public class AuthController {
     public ResponseEntity<AuthResponse> login(@RequestBody AuthRequest request) {
         return ResponseEntity.ok(authService.login(request));
     }
+
+    @PostMapping("/google")
+    public ResponseEntity<AuthResponse> loginWithGoogle(@RequestBody com.company.auth.domain.auth.dto.GoogleAuthRequest request) {
+        return ResponseEntity.ok(authService.loginWithGoogle(request));
+    }
+
+    @PostMapping("/setup-tenant")
+    public ResponseEntity<AuthResponse> setupTenant(@RequestBody RegisterRequest request, org.springframework.security.core.Authentication authentication) {
+        String email = authentication.getName();
+        return ResponseEntity.ok(authService.setupTenant(request, email));
+    }
 }

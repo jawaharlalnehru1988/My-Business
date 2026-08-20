@@ -20,6 +20,9 @@ public class Product {
     @Column(nullable = false)
     private String name;
 
+    @Column(name = "product_type", length = 20)
+    private String type; // "PHYSICAL" or "SERVICE"
+
     private String hsn;
 
     @Column(name = "purchase_price", precision = 15, scale = 2)

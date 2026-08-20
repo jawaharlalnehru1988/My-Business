@@ -259,12 +259,14 @@ export default function Dashboard({ onNew, onEdit, onDuplicate, onConvert, initi
       getStockAlertSettings().catch(() => ({ enabled: true, threshold: 5 })),
     ]).then(([prods, cfg]) => {
       setAllProducts(prods);
-      const val = prods.reduce((sum, p) => sum + (p.stock || 0) * (p.weightedAverageCost || p.purchasePrice || p.rate || 0), 0);
+      const val = prods
+        .filter(p => p.type !== 'SERVICE')
+        .reduce((sum, p) => sum + (p.stock || 0) * (p.weightedAverageCost || p.purchasePrice || p.rate || 0), 0);
       setInventoryValuation(val);
       
       if (cfg?.enabled === false) { setLowStockProducts([]); return; }
       const threshold = Number(cfg?.threshold ?? 5);
-      setLowStockProducts(prods.filter(p => (p.stock ?? 0) <= threshold));
+      setLowStockProducts(prods.filter(p => p.type !== 'SERVICE' && (p.stock ?? 0) <= threshold));
     });
   }, []);
 
