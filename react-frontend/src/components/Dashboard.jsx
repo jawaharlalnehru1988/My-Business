@@ -1090,7 +1090,7 @@ export default function Dashboard({ onNew, onEdit, onDuplicate, onConvert, initi
             <p className="stat-label" style={{ margin: 0 }}>Total Valuation</p>
           </div>
           <div className="stat-value" style={{ fontSize: '1.5rem' }}>
-            {formatCurrency(inventoryValuation, profileState?.currency || 'INR')}
+            {formatCurrency(inventoryValuation, profile?.currency || 'INR')}
           </div>
         </div>
 

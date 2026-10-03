@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useMemo, lazy, Suspense } from 'react';
+import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { Home, FileText, Settings, Plus, Users, Package, BarChart3, Wallet, RefreshCw, Receipt, BookOpen, Moon, Sun, Download, X, ShoppingCart, ChevronDown, ChevronUp, Building2, Pencil, HelpCircle, Search, Command, Bell, Calculator, User, LogOut, Barcode, Percent } from 'lucide-react';
-import { getAllProfiles, saveProfile, getEnabledModules, getAllBills, getAllProducts, getStockAlertSettings, getAllClients } from './store';
+import { getAllProfiles, saveProfile, getEnabledModules, getAllBills, getAllProducts, getStockAlertSettings, getAllClients, getProfile } from './store';
 import { isModuleEnabled, getUpcomingFilings } from './utils';
 // v1.10.4 — Route-level lazy loading. Prior App.jsx synchronously
 // imported all 12 views (~15k LOC combined), so a first-paint on
@@ -19,10 +20,10 @@ import { isModuleEnabled, getUpcomingFilings } from './utils';
 import Dashboard from './components/Dashboard';
 import InvoiceGenerator from './components/InvoiceGenerator';
 import SetupWizard from './components/SetupWizard';
-import BusinessSetupWizard from './components/BusinessSetupWizard';
+import SetupBusiness from './components/SetupBusiness';
 import ToastContainer from './components/Toast';
 import ConfirmModalContainer from './components/ConfirmModal';
-import WelcomeGuide from './components/WelcomeGuide';
+import Onboarding from './components/Onboarding';
 const SettingsView = lazy(() => import('./components/SettingsView'));
 const ClientsView = lazy(() => import('./components/ClientsView'));
 const SuppliersView = lazy(() => import('./components/SuppliersView'));
@@ -39,6 +40,7 @@ const PurchaseBills = lazy(() => import('./components/PurchaseBills'));
 const UserGuideView = lazy(() => import('./components/UserGuideView'));
 import { getPrintSettings } from './utils/printSettings';
 import Login from './components/Login';
+import Registration from './components/Registration';
 
 // v1.10.4 — Lightweight Suspense fallback shown while a lazy view
 // downloads. Purely visual — no data fetching, no state.
@@ -59,39 +61,28 @@ function ViewLoading() {
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
-    return !!localStorage.getItem('jwt_token');
+    const token = localStorage.getItem('jwt_token');
+    if (!token) return false;
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      if (payload.exp && payload.exp * 1000 < Date.now()) {
+        localStorage.removeItem('jwt_token');
+        localStorage.removeItem('user_email');
+        return false;
+      }
+    } catch (e) {
+      // ignore
+    }
+    return true;
   });
 
-  const handleLogout = () => {
-    localStorage.removeItem('jwt_token');
-    localStorage.removeItem('user_email');
-    setIsAuthenticated(false);
-  };
-
-  // v1.9.3 — Setup Wizard shown on first-run (before onboardingComplete = true)
   const [showWizard, setShowWizard] = useState(() => {
     try { return !getPrintSettings().onboardingComplete; } catch { return false; }
   });
   const [showBusinessWizard, setShowBusinessWizard] = useState(() => {
     return !!localStorage.getItem('jwt_token') && (!localStorage.getItem('tenantId') || localStorage.getItem('tenantId') === 'null');
   });
-  const [currentView, setCurrentView] = useState(() => {
-    // PWA manifest "shortcuts" deep-link in via ?view=X (e.g. right-clicking
-    // the pinned taskbar icon → "New Invoice" opens /?view=new). Honour that
-    // before falling back to whatever the user was last looking at.
-    try {
-      const params = new URLSearchParams(window.location.search);
-      const v = params.get('view');
-      const valid = ['dashboard', 'new', 'sale-invoices', 'estimate', 'proforma', 'sale-order', 'delivery-challan', 'credit-note', 'clients', 'suppliers', 'inventory', 'expenses', 'purchases', 'barcodes', 'recurring', 'receipts', 'reports', 'filing', 'incometax', 'guide', 'settings'];
-      if (v && valid.includes(v)) {
-        // Strip the query string so a refresh doesn't keep snapping back to
-        // the shortcut target — only the *first* navigation honours it.
-        window.history.replaceState({}, '', window.location.pathname);
-        return v;
-      }
-    } catch { /* sandboxed history API — fall through */ }
-    return sessionStorage.getItem('gst_currentView') || 'dashboard';
-  });
+  const [showWelcome, setShowWelcome] = useState(false);
   const [profile, setProfile] = useState(null);
   const [editingBill, setEditingBill] = useState(() => {
     try {
@@ -106,29 +97,68 @@ function App() {
   const [dashboardTypeFilter, setDashboardTypeFilter] = useState('all');
   const [receiptAutoOpen, setReceiptAutoOpen] = useState(false);
   const [lastView, setLastView] = useState('sale-invoices');
+  const [showInstallBanner, setShowInstallBanner] = useState(false);
+  const [serverDown, setServerDown] = useState(false);
+  const [serverStatus, setServerStatus] = useState('checking'); // 'checking' | 'online' | 'offline'
+  const [allProfiles, setAllProfiles] = useState([]);
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [updateInfo, setUpdateInfo] = useState(null);
+  const [showUpdateModal, setShowUpdateModal] = useState(false);
+
+  const deferredPrompt = useRef(null);
+  const retryTimer = useRef(null);
+  const profileLoaded = useRef(false);
+  const profileMenuRef = useRef(null);
+
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    localStorage.removeItem('jwt_token');
+    localStorage.removeItem('user_email');
+    setIsAuthenticated(false);
+  };
+
+  const currentView = (() => {
+    if (location.pathname.startsWith('/app/')) {
+      const v = location.pathname.substring(5);
+      return v || 'dashboard';
+    }
+    // Deep-links fallback
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const v = params.get('view');
+      if (v) return v;
+    } catch { /* ignore */ }
+    return sessionStorage.getItem('gst_currentView') || 'dashboard';
+  })();
+
+  const setCurrentView = (view) => {
+    navigate('/app/' + view);
+  };
+
+  useEffect(() => {
+    if (location.pathname.startsWith('/app/')) {
+      sessionStorage.setItem('gst_currentView', currentView);
+    }
+  }, [currentView, location.pathname]);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      setShowWelcome(false);
+      const tid = localStorage.getItem('tenantId');
+      if (!tid || tid === 'null' || tid === '') {
+        setShowBusinessWizard(true);
+      }
+    }
+  }, [isAuthenticated]);
+
   useEffect(() => {
     if (currentView && currentView !== 'new') {
       setLastView(currentView);
     }
   }, [currentView]);
-  const [showWelcome, setShowWelcome] = useState(false);
-  const [showInstallBanner, setShowInstallBanner] = useState(false);
-  const [serverDown, setServerDown] = useState(false);
-  const deferredPrompt = useRef(null);
-  const retryTimer = useRef(null);
 
-  const [serverStatus, setServerStatus] = useState('checking'); // 'checking' | 'online' | 'offline'
-  const profileLoaded = useRef(false);
-  const [allProfiles, setAllProfiles] = useState([]);
-  const [showProfileMenu, setShowProfileMenu] = useState(false);
-  const profileMenuRef = useRef(null);
-
-  // Update notification state. Auto-checks GitHub on mount + every 6h.
-  // The user can dismiss a specific version (stored in localStorage) so the
-  // banner doesn't keep nagging once they've seen it. A NEW version released
-  // after that dismissal will re-show the banner.
-  const [updateInfo, setUpdateInfo] = useState(null);
-  const [showUpdateModal, setShowUpdateModal] = useState(false);
   const updateBannerVisible = updateInfo?.updateAvailable
     && localStorage.getItem('freegstbill_dismissedUpdate') !== updateInfo.latest;
 
@@ -337,12 +367,12 @@ function App() {
 
     syncProfileData();
     if (serverStatus === 'online') {
-      getAllProfiles().then(setAllProfiles).catch(() => {});
+      getAllProfiles().then(setAllProfiles).catch(() => { });
     }
 
     const handleProfileUpdate = () => {
       syncProfileData();
-      getAllProfiles().then(setAllProfiles).catch(() => {});
+      getAllProfiles().then(setAllProfiles).catch(() => { });
     };
 
     window.addEventListener('fgsb-profile-updated', handleProfileUpdate);
@@ -694,28 +724,6 @@ function App() {
     );
   }
 
-  if (!isAuthenticated) {
-    return (
-      <Suspense fallback={<ViewLoading />}>
-        <Login onLoginSuccess={() => setIsAuthenticated(true)} />
-        <ToastContainer />
-      </Suspense>
-    );
-  }
-
-  if (showWelcome) {
-    return (
-      <>
-        <WelcomeGuide onComplete={(p) => {
-          if (p) setProfile(p);
-          setShowWelcome(false);
-        }} />
-        <ToastContainer />
-        <ConfirmModalContainer />
-      </>
-    );
-  }
-
   // v1.10.33 — "Finish setup" bottom-right pill. Shown when the user
   // hit Skip on the wizard (onboardingSkipped=true) so they can come
   // back later without hunting through Settings. Hidden after they
@@ -728,10 +736,9 @@ function App() {
     } catch { return false; }
   })();
 
-  return (
+  const appLayout = (
     <div className="app-layout">
-      {showBusinessWizard && <BusinessSetupWizard onComplete={() => setShowBusinessWizard(false)} />}
-      {showWizard && !showBusinessWizard && <SetupWizard onClose={() => setShowWizard(false)} />}
+      {showWizard && <SetupWizard onClose={() => setShowWizard(false)} />}
       {showResumeSetupPill && (
         <button type="button"
           onClick={() => setShowWizard(true)}
@@ -988,8 +995,8 @@ function App() {
         {/* Top Navigation Bar */}
         <header className="top-navbar">
           <div className="top-navbar-left">
-            <button 
-              className="navbar-search-btn" 
+            <button
+              className="navbar-search-btn"
               onClick={() => setShowPalette(true)}
               title="Global Search & Quick Actions (Ctrl+K)"
             >
@@ -1001,8 +1008,8 @@ function App() {
 
           <div className="top-navbar-right">
             {/* Active Business Profile Chip */}
-            <div 
-              className="navbar-business-chip" 
+            <div
+              className="navbar-business-chip"
               onClick={() => setCurrentView('settings')}
               title="Active Business Profile — Click to edit settings"
             >
@@ -1041,63 +1048,63 @@ function App() {
         {/* v1.10.4 — All lazy views under one Suspense boundary. Only the
              matched view's chunk actually loads; others stay unfetched. */}
         <Suspense fallback={<ViewLoading />}>
-        {currentView === 'sale-invoices' && (
-          <SaleInvoicesView docType="tax-invoice" onNew={handleNewInvoice} onEdit={handleEditInvoice} onDuplicate={handleDuplicateInvoice} onConvert={handleConvertToInvoice} />
-        )}
-        {currentView === 'estimate' && (
-          <SaleInvoicesView docType="estimate" onNew={handleNewInvoice} onEdit={handleEditInvoice} onDuplicate={handleDuplicateInvoice} onConvert={handleConvertToInvoice} />
-        )}
-        {currentView === 'proforma' && (
-          <SaleInvoicesView docType="proforma" onNew={handleNewInvoice} onEdit={handleEditInvoice} onDuplicate={handleDuplicateInvoice} onConvert={handleConvertToInvoice} />
-        )}
-        {currentView === 'sale-order' && (
-          <SaleInvoicesView docType="sale-order" onNew={handleNewInvoice} onEdit={handleEditInvoice} onDuplicate={handleDuplicateInvoice} onConvert={handleConvertToInvoice} />
-        )}
-        {currentView === 'delivery-challan' && (
-          <SaleInvoicesView docType="delivery-challan" onNew={handleNewInvoice} onEdit={handleEditInvoice} onDuplicate={handleDuplicateInvoice} onConvert={handleConvertToInvoice} />
-        )}
-        {currentView === 'credit-note' && (
-          <SaleInvoicesView docType="credit-note" onNew={handleNewInvoice} onEdit={handleEditInvoice} onDuplicate={handleDuplicateInvoice} onConvert={handleConvertToInvoice} />
-        )}
-        {currentView === 'clients' && (
-          <ClientsView onNew={handleNewInvoice} onEdit={handleEditInvoice} onDuplicate={handleDuplicateInvoice} />
-        )}
-        {currentView === 'suppliers' && (
-          <SuppliersView onNewPurchase={() => setCurrentView('purchases')} />
-        )}
-        {currentView === 'inventory' && (
-          <InventoryView />
-        )}
-        {currentView === 'expenses' && (
-          <ExpenseTracker />
-        )}
-        {currentView === 'purchases' && (
-          <PurchaseBills />
-        )}
-        {currentView === 'barcodes' && (
-          <BarcodeGeneratorView />
-        )}
-        {currentView === 'recurring' && (
-          <RecurringInvoices onEdit={handleEditInvoice} />
-        )}
-        {currentView === 'receipts' && (
-          <ReceiptVoucher autoOpenNew={receiptAutoOpen} />
-        )}
-        {currentView === 'reports' && (
-          <ReportsView />
-        )}
-        {currentView === 'filing' && (
-          <GSTReturns />
-        )}
-        {currentView === 'incometax' && (
-          <IncomeTax />
-        )}
-        {currentView === 'guide' && (
-          <UserGuideView />
-        )}
-        {currentView === 'settings' && (
-          <SettingsView onSaved={(p) => setProfile(p)} />
-        )}
+          {currentView === 'sale-invoices' && (
+            <SaleInvoicesView docType="tax-invoice" onNew={handleNewInvoice} onEdit={handleEditInvoice} onDuplicate={handleDuplicateInvoice} onConvert={handleConvertToInvoice} />
+          )}
+          {currentView === 'estimate' && (
+            <SaleInvoicesView docType="estimate" onNew={handleNewInvoice} onEdit={handleEditInvoice} onDuplicate={handleDuplicateInvoice} onConvert={handleConvertToInvoice} />
+          )}
+          {currentView === 'proforma' && (
+            <SaleInvoicesView docType="proforma" onNew={handleNewInvoice} onEdit={handleEditInvoice} onDuplicate={handleDuplicateInvoice} onConvert={handleConvertToInvoice} />
+          )}
+          {currentView === 'sale-order' && (
+            <SaleInvoicesView docType="sale-order" onNew={handleNewInvoice} onEdit={handleEditInvoice} onDuplicate={handleDuplicateInvoice} onConvert={handleConvertToInvoice} />
+          )}
+          {currentView === 'delivery-challan' && (
+            <SaleInvoicesView docType="delivery-challan" onNew={handleNewInvoice} onEdit={handleEditInvoice} onDuplicate={handleDuplicateInvoice} onConvert={handleConvertToInvoice} />
+          )}
+          {currentView === 'credit-note' && (
+            <SaleInvoicesView docType="credit-note" onNew={handleNewInvoice} onEdit={handleEditInvoice} onDuplicate={handleDuplicateInvoice} onConvert={handleConvertToInvoice} />
+          )}
+          {currentView === 'clients' && (
+            <ClientsView onNew={handleNewInvoice} onEdit={handleEditInvoice} onDuplicate={handleDuplicateInvoice} />
+          )}
+          {currentView === 'suppliers' && (
+            <SuppliersView onNewPurchase={() => setCurrentView('purchases')} />
+          )}
+          {currentView === 'inventory' && (
+            <InventoryView />
+          )}
+          {currentView === 'expenses' && (
+            <ExpenseTracker />
+          )}
+          {currentView === 'purchases' && (
+            <PurchaseBills />
+          )}
+          {currentView === 'barcodes' && (
+            <BarcodeGeneratorView />
+          )}
+          {currentView === 'recurring' && (
+            <RecurringInvoices onEdit={handleEditInvoice} />
+          )}
+          {currentView === 'receipts' && (
+            <ReceiptVoucher autoOpenNew={receiptAutoOpen} />
+          )}
+          {currentView === 'reports' && (
+            <ReportsView />
+          )}
+          {currentView === 'filing' && (
+            <GSTReturns />
+          )}
+          {currentView === 'incometax' && (
+            <IncomeTax />
+          )}
+          {currentView === 'guide' && (
+            <UserGuideView />
+          )}
+          {currentView === 'settings' && (
+            <SettingsView onSaved={(p) => setProfile(p)} />
+          )}
         </Suspense>
       </div>
 
@@ -1312,10 +1319,28 @@ function App() {
           </div>
         </div>
       )}
+    </div>
+  );
 
+  return (
+    <>
+      <Routes>
+        <Route path="/login" element={!isAuthenticated ? <Login onLoginSuccess={() => setIsAuthenticated(true)} /> : <Navigate to="/app/dashboard" />} />
+        <Route path="/registration" element={!isAuthenticated ? <Registration onLoginSuccess={() => setIsAuthenticated(true)} /> : <Navigate to="/app/dashboard" />} />
+        <Route path="/onboarding" element={isAuthenticated ? (showWelcome ? <Onboarding onComplete={(p) => { if (p) setProfile(p); setShowWelcome(false); }} /> : <Navigate to="/app/dashboard" />) : <Navigate to="/login" />} />
+        <Route path="/setup-business" element={isAuthenticated ? (showBusinessWizard ? <SetupBusiness onComplete={() => setShowBusinessWizard(false)} /> : <Navigate to="/app/dashboard" />) : <Navigate to="/login" />} />
+        <Route path="/app/*" element={
+          isAuthenticated ? (
+            showWelcome ? <Navigate to="/onboarding" /> :
+              showBusinessWizard ? <Navigate to="/setup-business" /> :
+                appLayout
+          ) : <Navigate to="/login" />
+        } />
+        <Route path="*" element={<Navigate to={isAuthenticated ? "/app/dashboard" : "/login"} />} />
+      </Routes>
       <ToastContainer />
       <ConfirmModalContainer />
-    </div>
+    </>
   );
 }
 

@@ -128,7 +128,6 @@ export const SAC_RATES = {
   '9996': { rate: 18,   label: 'Recreational, cultural, sporting (event mgmt, design)' },
   '9997': { rate: 18,   label: 'Other services (personal care, laundry, misc)' },
   '9998': { rate: 18,   label: 'Domestic services' },
-  '9985': { rate: 18,   label: 'Software development / IT services' },
 };
 
 /*

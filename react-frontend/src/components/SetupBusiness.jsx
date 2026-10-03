@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { toast } from './Toast';
 
-export default function BusinessSetupWizard({ onComplete }) {
+export default function SetupBusiness({ onComplete }) {
   const [businessName, setBusinessName] = useState('');
   const [gstNumber, setGstNumber] = useState('');
   const [address, setAddress] = useState('');
@@ -23,6 +23,13 @@ export default function BusinessSetupWizard({ onComplete }) {
         body: JSON.stringify({ businessName, gstNumber, address, contactInfo })
       });
 
+      if (res.status === 401) {
+        localStorage.removeItem('jwt_token');
+        localStorage.removeItem('user_email');
+        window.location.href = '/login';
+        return;
+      }
+      
       if (!res.ok) {
         throw new Error('Failed to setup business profile');
       }
@@ -65,9 +72,14 @@ export default function BusinessSetupWizard({ onComplete }) {
             <input type="text" value={contactInfo} onChange={e => setContactInfo(e.target.value)} style={{ width: '100%', padding: '0.75rem', borderRadius: '6px', border: '1px solid #cbd5e1' }} placeholder="Phone / Email" />
           </div>
 
-          <button type="submit" disabled={loading} style={{ background: '#2563eb', color: 'white', padding: '0.75rem', borderRadius: '6px', fontWeight: 600, border: 'none', cursor: 'pointer', marginTop: '1rem' }}>
-            {loading ? 'Setting up...' : 'Complete Setup'}
-          </button>
+          <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
+            <button type="submit" disabled={loading} style={{ flex: 1, background: '#2563eb', color: 'white', padding: '0.75rem', borderRadius: '6px', fontWeight: 600, border: 'none', cursor: 'pointer' }}>
+              {loading ? 'Setting up...' : 'Complete Setup'}
+            </button>
+            <button type="button" onClick={() => { localStorage.removeItem('jwt_token'); localStorage.removeItem('user_email'); window.location.href = '/login'; }} style={{ background: '#f1f5f9', color: '#475569', padding: '0.75rem 1.5rem', borderRadius: '6px', fontWeight: 600, border: 'none', cursor: 'pointer' }}>
+              Logout
+            </button>
+          </div>
         </form>
       </div>
     </div>

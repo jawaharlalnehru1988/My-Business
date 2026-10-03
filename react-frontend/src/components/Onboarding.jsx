@@ -11,7 +11,7 @@ const STEPS = [
   { id: 'ready', title: 'You\'re Ready!', icon: BarChart3 },
 ];
 
-export default function WelcomeGuide({ onComplete }) {
+export default function Onboarding({ onComplete }) {
   const [step, setStep] = useState(0);
   const detectedCountry = detectCountryFromBrowser();
   const [profile, setProfile] = useState({

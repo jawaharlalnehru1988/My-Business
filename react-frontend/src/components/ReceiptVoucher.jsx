@@ -41,13 +41,6 @@ export default function ReceiptVoucher({ autoOpenNew }) {
     }
   };
 
-  useEffect(() => {
-    loadData();
-    if (autoOpenNew) {
-      openAdd();
-    }
-  }, [autoOpenNew]);
-
   // Peek at the next receipt number using the SAME atomic counter that
   // invoice numbers use. Pre-v1.6.8 this counted `receipts.length + 1`
   // which raced under concurrent saves + two tabs.
@@ -63,18 +56,25 @@ export default function ReceiptVoucher({ autoOpenNew }) {
     }
   };
 
-  const filtered = search.trim()
-    ? receipts.filter(r =>
-        (r.clientName || '').toLowerCase().includes(search.toLowerCase()) ||
-        (r.receiptNo || '').toLowerCase().includes(search.toLowerCase()))
-    : receipts;
-
   const openAdd = async () => {
     const receiptNo = await getNextReceiptNo();
     setForm({ ...emptyForm, receiptNo });
     setEditingId(null);
     setShowForm(true);
   };
+
+  useEffect(() => {
+    loadData();
+    if (autoOpenNew) {
+      openAdd();
+    }
+  }, [autoOpenNew]);
+
+  const filtered = search.trim()
+    ? receipts.filter(r =>
+        (r.clientName || '').toLowerCase().includes(search.toLowerCase()) ||
+        (r.receiptNo || '').toLowerCase().includes(search.toLowerCase()))
+    : receipts;
 
   // v1.10.16 — reported: "here also add edit option" — the Payment Receipts
   // list only had Print + Delete. Delete + re-create lost the original

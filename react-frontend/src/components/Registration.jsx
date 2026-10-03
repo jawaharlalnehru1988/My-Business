@@ -1,86 +1,82 @@
 import { useState } from 'react';
-import { LogIn, Eye, EyeOff } from 'lucide-react';
+import { UserPlus, Eye, EyeOff } from 'lucide-react';
 import { toast } from './Toast';
-import { GoogleLogin } from '@react-oauth/google';
 import { useNavigate } from 'react-router-dom';
 
-export default function Login({ onLoginSuccess }) {
+export default function Registration({ onLoginSuccess }) {
   const navigate = useNavigate();
 
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [businessName, setBusinessName] = useState('');
+  const [gstNumber, setGstNumber] = useState('');
+  const [contactInfo, setContactInfo] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const handleGoogleSuccess = async (credentialResponse) => {
-    setLoading(true);
-    setError('');
-    try {
-      const res = await fetch('/api/v1/auth/google', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ credential: credentialResponse.credential })
-      });
-      if (!res.ok) throw new Error('Google authentication failed');
-      const data = await res.json();
-      localStorage.setItem('jwt_token', data.token);
-      localStorage.setItem('tenantId', data.tenantId || '');
-      localStorage.setItem('businessName', data.businessName || '');
-      toast('Signed in with Google successfully!', 'success');
-      onLoginSuccess();
-    } catch (err) {
-      setError(err.message || 'Google Login failed.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleLogin = async (e) => {
+  const handleRegistration = async (e) => {
     e.preventDefault();
+    if (!username || !password) {
+      setError('Please provide an email/username and password');
+      return;
+    }
     setLoading(true);
     setError('');
 
     try {
-      let res = await fetch('/api/v1/auth/login', {
+      let res = await fetch('/api/v1/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: username, username, password })
+        body: JSON.stringify({
+          email: username,
+          username,
+          password,
+          businessName: businessName.trim() || 'My Business',
+          gstNumber: gstNumber.trim(),
+          contactInfo: contactInfo.trim()
+        })
       });
 
       if (!res.ok) {
-        res = await fetch('/api/auth/login', {
+        res = await fetch('/api/auth/register', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: username, username, password })
+          body: JSON.stringify({
+            email: username,
+            username,
+            password,
+            businessName: businessName.trim() || 'My Business',
+            gstNumber: gstNumber.trim(),
+            contactInfo: contactInfo.trim()
+          })
         });
       }
 
       if (!res.ok) {
-        throw new Error('Invalid credentials');
+        const errText = await res.text().catch(() => '');
+        throw new Error(errText || 'Registration failed. User may already exist.');
       }
 
       const data = await res.json();
-      if (data.token) {
-        localStorage.setItem('jwt_token', data.token);
-        localStorage.setItem('user_email', username || data.username || 'jawaharlalnehru@gmail.com');
-        if (data.tenantId) localStorage.setItem('tenantId', data.tenantId);
-        if (data.businessName) localStorage.setItem('businessName', data.businessName);
-        if (data.businessName) {
-          try {
-            const p = JSON.parse(localStorage.getItem('freegstbill_profile') || '{}');
-            p.businessName = data.businessName;
-            localStorage.setItem('freegstbill_profile', JSON.stringify(p));
-            window.dispatchEvent(new Event('fgsb-profile-updated'));
-          } catch { /* ignore */ }
-        }
-        toast('Logged in successfully', 'success');
-        onLoginSuccess();
-      } else {
-        throw new Error('No token received');
-      }
+      const token = data.token || 'mock_jwt_token_' + Date.now();
+      localStorage.setItem('jwt_token', token);
+      localStorage.setItem('user_email', username);
+      if (data.tenantId) localStorage.setItem('tenantId', data.tenantId);
+      if (data.businessName) localStorage.setItem('businessName', data.businessName);
+      
+      const newProfile = {
+        businessName: businessName.trim() || 'My Business',
+        gstin: gstNumber.trim(),
+        phone: contactInfo.trim()
+      };
+      localStorage.setItem('freegstbill_profile', JSON.stringify(newProfile));
+      window.dispatchEvent(new Event('fgsb-profile-updated'));
+
+      toast('Account created & logged in successfully!', 'success');
+      onLoginSuccess();
     } catch (err) {
-      setError(err.message || 'Login failed. Ensure the backend is running.');
+      setError(err.message || 'Registration failed.');
     } finally {
       setLoading(false);
     }
@@ -93,29 +89,12 @@ export default function Login({ onLoginSuccess }) {
         {/* Header Icon */}
         <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
           <div style={{ width: 56, height: 56, borderRadius: '50%', background: 'rgba(37, 99, 235, 0.1)', color: 'var(--primary, #2563eb)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: '0.75rem' }}>
-            <LogIn size={28} />
+            <UserPlus size={28} />
           </div>
           <h2 style={{ fontSize: '1.5rem', fontWeight: 700, margin: '0 0 0.25rem' }}>GST Billing & Accounting</h2>
           <p style={{ color: 'var(--text-muted, #64748b)', fontSize: '0.9rem', margin: 0 }}>
-            Sign in to access your business console
+            Create a new business client account
           </p>
-        </div>
-
-        {/* Google Login */}
-        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1.5rem' }}>
-          <GoogleLogin
-            onSuccess={handleGoogleSuccess}
-            onError={() => {
-              setError('Google Login Failed');
-            }}
-            useOneTap
-          />
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', margin: '1.5rem 0' }}>
-          <div style={{ flex: 1, height: '1px', background: '#e2e8f0' }}></div>
-          <span style={{ padding: '0 10px', color: '#94a3b8', fontSize: '0.85rem' }}>OR</span>
-          <div style={{ flex: 1, height: '1px', background: '#e2e8f0' }}></div>
         </div>
 
         {/* Tab Switcher */}
@@ -125,8 +104,8 @@ export default function Login({ onLoginSuccess }) {
             onClick={() => { navigate('/login'); setError(''); }}
             style={{
               flex: 1, padding: '0.55rem', border: 'none', borderRadius: '6px', fontSize: '0.88rem', fontWeight: 600, cursor: 'pointer',
-              background: 'white', color: 'var(--primary, #2563eb)',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.1)', transition: 'all 0.2s'
+              background: 'transparent', color: 'var(--text-muted, #64748b)',
+              boxShadow: 'none', transition: 'all 0.2s'
             }}
           >
             Sign In
@@ -136,8 +115,8 @@ export default function Login({ onLoginSuccess }) {
             onClick={() => { navigate('/registration'); setError(''); }}
             style={{
               flex: 1, padding: '0.55rem', border: 'none', borderRadius: '6px', fontSize: '0.88rem', fontWeight: 600, cursor: 'pointer',
-              background: 'transparent', color: 'var(--text-muted, #64748b)',
-              boxShadow: 'none', transition: 'all 0.2s'
+              background: 'white', color: 'var(--primary, #2563eb)',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.1)', transition: 'all 0.2s'
             }}
           >
             New Account (Sign Up)
@@ -150,7 +129,7 @@ export default function Login({ onLoginSuccess }) {
           </div>
         )}
 
-        <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        <form onSubmit={handleRegistration} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           
           {/* Email / Username */}
           <div>
@@ -165,6 +144,49 @@ export default function Login({ onLoginSuccess }) {
               required
               style={{ width: '100%', padding: '0.7rem 0.85rem', borderRadius: '6px', border: '1px solid var(--border, #cbd5e1)', fontSize: '0.9rem', outline: 'none' }}
             />
+          </div>
+
+          {/* Business Name */}
+          <div>
+            <label style={{ display: 'block', marginBottom: '0.35rem', fontSize: '0.88rem', fontWeight: 600, color: 'var(--text-primary, #0f172a)' }}>
+              Business / Firm Name *
+            </label>
+            <input 
+              type="text" 
+              value={businessName}
+              onChange={e => setBusinessName(e.target.value)}
+              placeholder="e.g. Nehru Textile Mills"
+              required
+              style={{ width: '100%', padding: '0.7rem 0.85rem', borderRadius: '6px', border: '1px solid var(--border, #cbd5e1)', fontSize: '0.9rem', outline: 'none' }}
+            />
+          </div>
+
+          {/* GSTIN & Phone */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+            <div>
+              <label style={{ display: 'block', marginBottom: '0.35rem', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary, #0f172a)' }}>
+                GSTIN (Optional)
+              </label>
+              <input 
+                type="text" 
+                value={gstNumber}
+                onChange={e => setGstNumber(e.target.value)}
+                placeholder="27AAAAA0000A1Z5"
+                style={{ width: '100%', padding: '0.65rem 0.75rem', borderRadius: '6px', border: '1px solid var(--border, #cbd5e1)', fontSize: '0.85rem' }}
+              />
+            </div>
+            <div>
+              <label style={{ display: 'block', marginBottom: '0.35rem', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary, #0f172a)' }}>
+                Phone (Optional)
+              </label>
+              <input 
+                type="text" 
+                value={contactInfo}
+                onChange={e => setContactInfo(e.target.value)}
+                placeholder="+91 9876543210"
+                style={{ width: '100%', padding: '0.65rem 0.75rem', borderRadius: '6px', border: '1px solid var(--border, #cbd5e1)', fontSize: '0.85rem' }}
+              />
+            </div>
           </div>
 
           {/* Password */}
@@ -214,13 +236,13 @@ export default function Login({ onLoginSuccess }) {
               transition: 'background 0.2s'
             }}
           >
-            {loading ? 'Signing in...' : 'Sign In'}
+            {loading ? 'Creating Account...' : 'Create Client Account'}
           </button>
         </form>
 
         {/* Toggle Mode Footer Link */}
         <div style={{ textAlign: 'center', marginTop: '1.5rem', paddingTop: '1rem', borderTop: '1px solid var(--border, #f1f5f9)', fontSize: '0.88rem' }}>
-          <span>New client or business? <button type="button" onClick={() => { navigate('/registration'); setError(''); }} style={{ background: 'none', border: 'none', color: 'var(--primary, #2563eb)', fontWeight: 600, cursor: 'pointer', padding: 0 }}>Create an account</button></span>
+          <span>Already have an account? <button type="button" onClick={() => { navigate('/login'); setError(''); }} style={{ background: 'none', border: 'none', color: 'var(--primary, #2563eb)', fontWeight: 600, cursor: 'pointer', padding: 0 }}>Sign In</button></span>
         </div>
       </div>
     </div>

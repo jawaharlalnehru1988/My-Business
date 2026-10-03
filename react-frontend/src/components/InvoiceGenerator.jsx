@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react';
-import { ArrowLeft, Plus, Trash2, Download, UserPlus, Pencil, Settings, ChevronUp, ChevronDown, MessageCircle, Check, Loader, Truck, Printer } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Download, UserPlus, Pencil, Settings, ChevronUp, ChevronDown, MessageCircle, Check, Loader, Truck, Printer, Eye } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
 import { saveBill, getNextInvoiceNumber, getTermsTemplates, getAllClients, saveClient, getProfile, getAllProducts, saveProduct, getInvoiceDisplayOptions, saveInvoiceDisplayOptions, getAllProfiles, getRegionMode, saveRecurring, getAllBills, saveSupplier } from '../store';
@@ -8,6 +8,7 @@ import { getPrintSettings, savePrintSettings } from '../utils/printSettings';
 import { openWhatsAppShare } from '../utils/share';
 import { confirmAction, promptAction } from './ConfirmModal';
 import ThermalPreviewModal from './ThermalPreviewModal';
+import InvoicePreviewModal from './InvoicePreviewModal';
 import { ensureToken, findOrCreateFolder, uploadPDF } from '../services/googleDrive';
 import DOMPurify from 'dompurify';
 import InvoicePreview from './InvoicePreview';
@@ -472,12 +473,8 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
   // that we have to see in invoice preview what we are entering". Focus
   // mode: hide the preview so the editor gets the full width during
   // heavy data entry.
-  const [previewCollapsed, setPreviewCollapsed] = useState(() => {
-    try { return localStorage.getItem('fgsb_previewCollapsed') === '1'; } catch { return false; }
-  });
-  useEffect(() => {
-    try { localStorage.setItem('fgsb_previewCollapsed', previewCollapsed ? '1' : '0'); } catch { /* sandboxed */ }
-  }, [previewCollapsed]);
+  const [previewCollapsed, setPreviewCollapsed] = useState(true);
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [details, setDetails] = useState(draft?.details || {
     invoiceNumber: '',
     invoiceDate: new Date().toISOString().split('T')[0],
@@ -2421,6 +2418,9 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
           </span>
         </div>
         <div className="flex gap-2">
+          <button className="btn btn-secondary" onClick={() => setShowPreviewModal(true)} title="Preview full invoice before printing/downloading">
+            <Eye size={18} /> Preview
+          </button>
           <button className="btn btn-primary" onClick={generatePDF} disabled={saving}>
             <Download size={18} /> {saving ? 'Generating...' : 'Download PDF'}
           </button>
@@ -2445,17 +2445,6 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
 
       <div className={`split-view ${previewCollapsed ? 'split-view-focus' : ''}`}>
         <div className="editor-pane">
-          {/* v1.10.22 — focus mode toggle. When ON, preview is hidden and
-              the editor takes the full width so line-item entry has room
-              to breathe. Persists across page loads. */}
-          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
-            <button type="button" className="btn btn-secondary"
-              onClick={() => setPreviewCollapsed(v => !v)}
-              style={{ fontSize: '0.72rem', padding: '0.25rem 0.6rem' }}
-              title={previewCollapsed ? 'Show live preview' : 'Hide preview to focus on entries'}>
-              {previewCollapsed ? '◀ Show preview' : '▶ Focus mode (hide preview)'}
-            </button>
-          </div>
 
           {/* Business Profile Selector — shown only if multiple profiles saved */}
           {allProfiles.length > 1 && (
@@ -3518,6 +3507,24 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
       {/* v1.10.34 — Thermal receipt preview modal. Opens when the user
           clicks Print on a thermal-sized invoice. Modal shows the receipt
           live, click Print inside to send vector HTML to the printer. */}
+      <InvoicePreviewModal
+        isOpen={showPreviewModal}
+        onClose={() => setShowPreviewModal(false)}
+        profile={profile}
+        client={client}
+        details={details}
+        items={items}
+        totals={totals}
+        invoiceType={invoiceType}
+        customTerms={customTerms}
+        customNotes={customNotes}
+        extraSections={extraSections}
+        invoiceOptions={invoiceOptions}
+        onDownloadPdf={generatePDF}
+        onPrint={directPrint}
+        saving={saving}
+      />
+
       <ThermalPreviewModal
         isOpen={showThermalPreview}
         onClose={() => setShowThermalPreview(false)}

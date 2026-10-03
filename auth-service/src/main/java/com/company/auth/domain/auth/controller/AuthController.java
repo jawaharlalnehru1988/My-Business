@@ -8,6 +8,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import com.company.auth.core.security.JwtUtil;
+
 @RestController
 @RequestMapping({"/api/v1/auth", "/api/auth"})
 @RequiredArgsConstructor
@@ -15,6 +17,7 @@ import org.springframework.web.bind.annotation.*;
 public class AuthController {
 
     private final AuthService authService;
+    private final JwtUtil jwtUtil;
 
     @PostMapping("/register")
     public ResponseEntity<AuthResponse> register(@RequestBody RegisterRequest request) {
@@ -32,8 +35,18 @@ public class AuthController {
     }
 
     @PostMapping("/setup-tenant")
-    public ResponseEntity<AuthResponse> setupTenant(@RequestBody RegisterRequest request, org.springframework.security.core.Authentication authentication) {
-        String email = authentication.getName();
-        return ResponseEntity.ok(authService.setupTenant(request, email));
+    public ResponseEntity<AuthResponse> setupTenant(
+            @RequestBody RegisterRequest request, 
+            @RequestHeader(value = "Authorization", required = false) String authHeader) {
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            return ResponseEntity.status(401).build();
+        }
+        String token = authHeader.substring(7);
+        try {
+            String email = jwtUtil.extractUsername(token);
+            return ResponseEntity.ok(authService.setupTenant(request, email));
+        } catch (io.jsonwebtoken.JwtException e) {
+            return ResponseEntity.status(401).build();
+        }
     }
 }
