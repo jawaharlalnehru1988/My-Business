@@ -1,0 +1,26 @@
+name: CI/CD - Deploy to VPS
+
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Deploy Microservices to VPS
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: SSH to VPS and trigger deployment
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USERNAME }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT || 22222 }}
+          script_stop: true
+          script: |
+            cd /var/www/My-Business
+            chmod +x deploy.sh
+            ./deploy.sh
