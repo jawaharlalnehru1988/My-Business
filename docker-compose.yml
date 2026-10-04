@@ -1,3 +1,5 @@
+version: '3.8'
+
 services:
   zookeeper:
     image: confluentinc/cp-zookeeper:7.4.0
@@ -27,8 +29,6 @@ services:
 
   postgres:
     image: postgres:15-alpine
-    ports:
-      - "5432:5432"
     environment:
       POSTGRES_DB: accounting_db
       POSTGRES_USER: postgres

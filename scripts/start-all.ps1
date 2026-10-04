@@ -105,7 +105,7 @@ if (Test-PortListening 8089) {
     Write-Host "ALREADY RUNNING" -ForegroundColor Green
 } else {
     Start-Process -FilePath "java" `
-        -ArgumentList "-jar", "-Xms128m", "-Xmx256m", "api-gateway\target\api-gateway-0.0.1-SNAPSHOT.jar" `
+        -ArgumentList "-Dserver.port=8089", "-jar", "-Xms128m", "-Xmx256m", "api-gateway\target\api-gateway-0.0.1-SNAPSHOT.jar" `
         -RedirectStandardOutput "$logDir\api-gateway.log" `
         -RedirectStandardError "$logDir\api-gateway.err.log" `
         -WindowStyle Hidden
