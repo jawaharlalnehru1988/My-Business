@@ -1,10 +1,13 @@
 package com.company.inventory_service.domain.inventory.dto;
 
+import com.company.inventory_service.core.json.ExtensibleDTO;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import java.math.BigDecimal;
 
 @Data
-public class ProductDTO {
+@EqualsAndHashCode(callSuper = false)
+public class ProductDTO extends ExtensibleDTO {
     private Long id;
     private String name;
     private String hsn;

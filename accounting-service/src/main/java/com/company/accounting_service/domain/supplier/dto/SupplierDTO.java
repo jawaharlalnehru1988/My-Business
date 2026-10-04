@@ -1,9 +1,12 @@
 package com.company.accounting_service.domain.supplier.dto;
 
+import com.company.accounting_service.core.json.ExtensibleDTO;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 
 @Data
-public class SupplierDTO {
+@EqualsAndHashCode(callSuper = false)
+public class SupplierDTO extends ExtensibleDTO {
     private Long id;
     private String name;
     private String address;

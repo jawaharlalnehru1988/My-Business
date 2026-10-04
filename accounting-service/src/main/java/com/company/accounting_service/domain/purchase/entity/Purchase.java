@@ -45,6 +45,12 @@ public class Purchase {
     @Column(columnDefinition = "TEXT")
     private String note;
 
+    @Column(name = "extra_json", columnDefinition = "TEXT")
+    private String extraJson;
+
+    @Column(name = "tenant_id")
+    private Long tenantId;
+
     @OneToMany(mappedBy = "purchase", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<PurchaseLineItem> items = new ArrayList<>();

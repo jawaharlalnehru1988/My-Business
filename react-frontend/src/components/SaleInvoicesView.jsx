@@ -1,20 +1,120 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Plus, Search, Download, Printer, Settings, Filter, X, ChevronDown, AlertTriangle, Eye, Pencil, Copy, Trash2, CheckCircle, Clock, AlertCircle, FileText } from 'lucide-react';
+import {
+  Plus, Search, Download, Printer, Settings, Filter, X,
+  ChevronDown, AlertTriangle, Eye, Pencil, Copy, Trash2,
+  CheckCircle, Clock, AlertCircle, FileText, Zap, MessageCircle,
+  Truck, ArrowRight, ArrowUpRight, CheckCircle2, RefreshCw,
+  ShoppingCart, Send, Calendar, Check, Ban
+} from 'lucide-react';
 import { getAllBills, saveBill, deleteBill, getProfile, getAllProfiles } from '../store';
-import { formatCurrency, INVOICE_TYPES } from '../utils';
+import { formatCurrency, INVOICE_TYPES, getCountryConfig } from '../utils';
+import { openWhatsAppShare } from '../utils/share';
 import { toast } from './Toast';
 import { confirmAction } from './ConfirmModal';
 
+// Extended definitions and lifecycle statuses for each commercial document type
+const EXTENDED_DOC_CONFIGS = {
+  'estimate': {
+    id: 'estimate',
+    label: 'Estimates / Quotations',
+    prefix: 'EST',
+    title: 'ESTIMATE / QUOTATION',
+    singular: 'Quotation',
+    verb: 'Quotation',
+    icon: FileText,
+    accent: '#2563eb',
+    statusOptions: [
+      { id: 'open', label: 'Open / Pending', color: '#2563eb', bg: '#eff6ff' },
+      { id: 'accepted', label: 'Accepted', color: '#059669', bg: '#ecfdf5' },
+      { id: 'converted', label: 'Converted to Sale', color: '#16a34a', bg: '#f0fdf4' },
+      { id: 'rejected', label: 'Declined', color: '#dc2626', bg: '#fee2e2' },
+      { id: 'expired', label: 'Expired', color: '#6b7280', bg: '#f3f4f6' },
+    ]
+  },
+  'sale-order': {
+    id: 'sale-order',
+    label: 'Sale Orders',
+    prefix: 'SO',
+    title: 'SALE ORDER',
+    singular: 'Sale Order',
+    verb: 'Sale Order',
+    icon: ShoppingCart,
+    accent: '#ea580c',
+    statusOptions: [
+      { id: 'open', label: 'Active Order', color: '#ea580c', bg: '#fff7ed' },
+      { id: 'in_progress', label: 'Packing / In-Progress', color: '#d97706', bg: '#fef3c7' },
+      { id: 'delivered', label: 'Dispatched / Delivered', color: '#0284c7', bg: '#f0f9ff' },
+      { id: 'completed', label: 'Fulfilled & Invoiced', color: '#16a34a', bg: '#f0fdf4' },
+      { id: 'cancelled', label: 'Cancelled', color: '#dc2626', bg: '#fee2e2' },
+    ]
+  },
+  'delivery-challan': {
+    id: 'delivery-challan',
+    label: 'Delivery Challans',
+    prefix: 'DC',
+    title: 'DELIVERY CHALLAN',
+    singular: 'Delivery Challan',
+    verb: 'Challan',
+    icon: Truck,
+    accent: '#0284c7',
+    statusOptions: [
+      { id: 'open', label: 'Dispatched', color: '#0284c7', bg: '#f0f9ff' },
+      { id: 'in_transit', label: 'In-Transit', color: '#7c3aed', bg: '#f5f3ff' },
+      { id: 'delivered', label: 'Delivered to Party', color: '#059669', bg: '#ecfdf5' },
+      { id: 'invoiced', label: 'Converted to Invoice', color: '#16a34a', bg: '#f0fdf4' },
+      { id: 'returned', label: 'Goods Returned', color: '#dc2626', bg: '#fee2e2' },
+    ]
+  },
+  'proforma': {
+    id: 'proforma',
+    label: 'Proforma Invoices',
+    prefix: 'PI',
+    title: 'PROFORMA INVOICE',
+    singular: 'Proforma Invoice',
+    verb: 'Proforma',
+    icon: FileText,
+    accent: '#7c3aed',
+    statusOptions: [
+      { id: 'open', label: 'Pending Payment', color: '#7c3aed', bg: '#f5f3ff' },
+      { id: 'converted', label: 'Converted to Tax Invoice', color: '#16a34a', bg: '#f0fdf4' },
+      { id: 'cancelled', label: 'Cancelled', color: '#dc2626', bg: '#fee2e2' },
+    ]
+  },
+  'tax-invoice': {
+    id: 'tax-invoice',
+    label: 'Sale Invoices',
+    prefix: 'INV',
+    title: 'TAX INVOICE',
+    singular: 'Tax Invoice',
+    verb: 'Sale Invoice',
+    icon: FileText,
+    accent: '#059669',
+    statusOptions: [
+      { id: 'paid', label: 'Paid', color: '#166534', bg: '#dcfce7' },
+      { id: 'partial', label: 'Partially Paid', color: '#92400e', bg: '#fef3c7' },
+      { id: 'unpaid', label: 'Unpaid', color: '#991b1b', bg: '#fee2e2' },
+      { id: 'overdue', label: 'Overdue', color: '#dc2626', bg: '#fee2e2' },
+    ]
+  }
+};
+
 export default function SaleInvoicesView({ docType = 'tax-invoice', onNew, onEdit, onDuplicate, onConvert }) {
+  // Current Active Document Tab
+  const [currentTab, setCurrentTab] = useState(docType || 'tax-invoice');
+
   const [bills, setBills] = useState([]);
+  const [profile, setProfile] = useState({});
+  const [firms, setFirms] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  // Search & Filter
   const [search, setSearch] = useState('');
-  const [showSearchBox, setShowSearchBox] = useState(false);
-  
+  const [statusFilter, setStatusFilter] = useState('all'); // 'all' | specific status
+
   // Date Quick Filter presets: 'this_month', 'today', 'this_week', 'this_quarter', 'this_financial_year', 'custom', 'all'
   const [periodFilter, setPeriodFilter] = useState('this_month');
   const [showDatePicker, setShowDatePicker] = useState(false);
-  
+
   // Calculate initial date range for 'this_month'
   const getInitialDates = () => {
     const now = new Date();
@@ -26,35 +126,32 @@ export default function SaleInvoicesView({ docType = 'tax-invoice', onNew, onEdi
   const [dateFrom, setDateFrom] = useState(() => getInitialDates().from);
   const [dateTo, setDateTo] = useState(() => getInitialDates().to);
   const [selectedFirm, setSelectedFirm] = useState('all');
-  const [firms, setFirms] = useState([]);
-  
-  // Column filter states
-  const [colFilters, setColFilters] = useState({
-    date: '',
-    invoiceNo: '',
-    partyName: '',
-    transaction: '',
-    paymentType: '',
-    status: '',
-  });
 
-  const [activeColFilter, setActiveColFilter] = useState(null);
+  // Preview Modal State
+  const [previewBill, setPreviewBill] = useState(null);
 
-  // Load Bills and Profiles
+  // Sync internal tab if incoming docType prop changes
+  useEffect(() => {
+    if (docType && EXTENDED_DOC_CONFIGS[docType]) {
+      setCurrentTab(docType);
+    }
+  }, [docType]);
+
+  // Load Bills and Business Profiles
   const loadData = async () => {
     setLoading(true);
     try {
       const [allBillsData, currentProfile, allProfilesData] = await Promise.all([
-        getAllBills(),
-        getProfile(),
-        getAllProfiles(),
+        getAllBills().catch(() => []),
+        getProfile().catch(() => ({})),
+        getAllProfiles().catch(() => []),
       ]);
-      setBills(allBillsData);
+      setBills(Array.isArray(allBillsData) ? allBillsData : []);
+      if (currentProfile) setProfile(currentProfile);
       const profileList = allProfilesData.length > 0 ? allProfilesData : (currentProfile ? [currentProfile] : []);
       setFirms(profileList);
-    } catch (err) {
-      console.error(err);
-      toast('Failed to load sales data', 'error');
+    } catch {
+      toast('Failed to load document records', 'error');
     } finally {
       setLoading(false);
     }
@@ -62,7 +159,7 @@ export default function SaleInvoicesView({ docType = 'tax-invoice', onNew, onEdi
 
   useEffect(() => {
     loadData();
-  }, [docType]);
+  }, [currentTab]);
 
   // Update date range when periodFilter changes
   useEffect(() => {
@@ -101,37 +198,33 @@ export default function SaleInvoicesView({ docType = 'tax-invoice', onNew, onEdi
     }
   }, [periodFilter]);
 
-  // Current document type configuration
-  const currentTypeConfig = INVOICE_TYPES[docType] || {
-    label: 'Sale Invoices',
-    prefix: 'INV',
-    title: 'SALE INVOICES',
-  };
+  const activeConfig = EXTENDED_DOC_CONFIGS[currentTab] || EXTENDED_DOC_CONFIGS['tax-invoice'];
+  const profileCurrency = getCountryConfig(profile?.country || 'India').currency;
 
-  // Filter bills by docType, date range, search query, firm, and column filters
+  // Filter bills by active document type, date range, search query, firm, and status
   const filteredBills = useMemo(() => {
     return bills.filter(bill => {
       // 1. Doc Type filter
-      const bType = bill.invoiceType || 'tax-invoice';
-      if (docType === 'tax-invoice') {
-        // 'tax-invoice' view shows tax invoices & standard sales
+      const bType = bill.invoiceType || bill.data?.invoiceType || (bill.type === 'proforma' ? 'proforma' : 'tax-invoice');
+      if (currentTab === 'tax-invoice') {
         if (bType !== 'tax-invoice' && bType !== 'bill-of-supply' && bType !== 'composition') return false;
-      } else if (bType !== docType) {
+      } else if (bType !== currentTab) {
         return false;
       }
 
       // 2. Date Range filter
-      const bDate = bill.data?.details?.invoiceDate || bill.createdAt?.split('T')[0] || '';
+      const bDate = bill.invoiceDate || bill.data?.details?.invoiceDate || bill.createdAt?.split('T')[0] || '';
       if (dateFrom && bDate < dateFrom) return false;
       if (dateTo && bDate > dateTo) return false;
 
       // 3. Search query
       if (search.trim()) {
         const q = search.toLowerCase();
-        const party = (bill.data?.client?.name || '').toLowerCase();
+        const party = (bill.clientName || bill.data?.client?.name || '').toLowerCase();
         const invNo = (bill.invoiceNumber || '').toLowerCase();
-        const total = String(bill.data?.totals?.total || bill.amount || '');
-        if (!party.includes(q) && !invNo.includes(q) && !total.includes(q)) {
+        const total = String(bill.totalAmount || bill.data?.totals?.total || bill.amount || '');
+        const items = (bill.data?.items || bill.items || []).map(it => (it.name || '').toLowerCase()).join(' ');
+        if (!party.includes(q) && !invNo.includes(q) && !total.includes(q) && !items.includes(q)) {
           return false;
         }
       }
@@ -141,38 +234,196 @@ export default function SaleInvoicesView({ docType = 'tax-invoice', onNew, onEdi
         return false;
       }
 
-      // 5. Column filters
-      if (colFilters.date && !bDate.includes(colFilters.date)) return false;
-      if (colFilters.invoiceNo && !(bill.invoiceNumber || '').toLowerCase().includes(colFilters.invoiceNo.toLowerCase())) return false;
-      if (colFilters.partyName && !(bill.data?.client?.name || '').toLowerCase().includes(colFilters.partyName.toLowerCase())) return false;
-      if (colFilters.status && bill.status !== colFilters.status) return false;
+      // 5. Status filter
+      if (statusFilter !== 'all') {
+        const bStatus = bill.status || (bill.paidAmount >= bill.totalAmount ? 'paid' : 'open');
+        if (bStatus !== statusFilter) return false;
+      }
 
       return true;
+    }).sort((a, b) => {
+      const dateA = a.invoiceDate || a.data?.details?.invoiceDate || a.createdAt || '';
+      const dateB = b.invoiceDate || b.data?.details?.invoiceDate || b.createdAt || '';
+      return dateB.localeCompare(dateA);
     });
-  }, [bills, docType, dateFrom, dateTo, search, selectedFirm, colFilters]);
+  }, [bills, currentTab, dateFrom, dateTo, search, selectedFirm, statusFilter]);
 
-  // Calculate Totals for top card
-  const stats = useMemo(() => {
-    let totalSales = 0;
-    let received = 0;
-    let balance = 0;
+  // Dynamic KPI Stats calculated specifically for the active document type
+  const kpiStats = useMemo(() => {
+    let totalValue = 0;
+    let receivedOrAdvance = 0;
+    let pendingBalance = 0;
+    let openCount = 0;
+    let convertedCount = 0;
+    let totalItemsQty = 0;
 
-    for (const b of filteredBills) {
-      const tot = Number(b.data?.totals?.total || b.amount || 0);
-      const p = Number(b.paidAmount || (b.status === 'paid' ? tot : 0));
-      const bal = Number(b.balanceAmount !== undefined ? b.balanceAmount : (tot - p));
+    filteredBills.forEach(b => {
+      const tot = Number(b.totalAmount || b.data?.totals?.total || b.amount || 0);
+      const paid = Number(b.paidAmount || (b.status === 'paid' ? tot : 0));
+      const bal = Number(b.balanceAmount !== undefined ? b.balanceAmount : Math.max(0, tot - paid));
+      const bStatus = (b.status || 'open').toLowerCase();
 
-      totalSales += tot;
-      received += p;
-      balance += Math.max(0, bal);
-    }
+      totalValue += tot;
+      receivedOrAdvance += paid;
+      pendingBalance += bal;
 
-    return { totalSales, received, balance, count: filteredBills.length };
+      if (bStatus === 'open' || bStatus === 'active' || bStatus === 'in_progress' || bStatus === 'in_transit') {
+        openCount += 1;
+      }
+      if (bStatus === 'converted' || bStatus === 'completed' || bStatus === 'invoiced') {
+        convertedCount += 1;
+      }
+
+      const items = b.data?.items || b.items || [];
+      items.forEach(it => {
+        totalItemsQty += Number(it.quantity) || 1;
+      });
+    });
+
+    const conversionRate = filteredBills.length > 0 ? (convertedCount / filteredBills.length) * 100 : 0;
+
+    return {
+      totalValue,
+      receivedOrAdvance,
+      pendingBalance,
+      openCount,
+      convertedCount,
+      conversionRate,
+      totalItemsQty,
+      count: filteredBills.length
+    };
   }, [filteredBills]);
 
-  // Format date helper (e.g. 01/10/2025)
+  // Status Quick-Toggle Handler
+  const handleUpdateStatus = async (bill, newStatus) => {
+    try {
+      const updated = { ...bill, status: newStatus };
+      await saveBill(updated, { overwrite: true });
+      setBills(prev => prev.map(b => b.id === bill.id ? updated : b));
+      toast(`Status updated to "${newStatus.replace('_', ' ').toUpperCase()}"`, 'success');
+    } catch {
+      toast('Failed to update status', 'error');
+    }
+  };
+
+  // 1-Click Convert to Tax Invoice
+  const handleConvertClick = async (bill) => {
+    if (bill.status === 'converted') {
+      const reConvert = await confirmAction({
+        title: 'Already Converted',
+        message: `This ${activeConfig.singular} (${bill.invoiceNumber}) was already converted. Do you wish to generate another Tax Invoice from it?`,
+        confirmLabel: 'Convert Again',
+        tone: 'primary'
+      });
+      if (!reConvert) return;
+    }
+
+    // Automatically mark the current document as converted in the background
+    try {
+      await saveBill({ ...bill, status: 'converted' }, { overwrite: true });
+      setBills(prev => prev.map(b => b.id === bill.id ? { ...b, status: 'converted' } : b));
+    } catch { /* proceed with conversion anyway */ }
+
+    toast(`Converting ${activeConfig.singular} #${bill.invoiceNumber} to Tax Invoice...`, 'info');
+    if (onConvert) {
+      onConvert(bill);
+    }
+  };
+
+  // WhatsApp Share Handler
+  const handleWhatsAppShare = (bill) => {
+    const partyName = bill.clientName || bill.data?.client?.name || 'Valued Customer';
+    const phone = bill.data?.client?.phone || bill.clientPhone || bill.phone || '';
+    const docNo = bill.invoiceNumber || 'DOC';
+    const docDate = bill.invoiceDate || bill.data?.details?.invoiceDate || 'Today';
+    const total = Number(bill.totalAmount || bill.data?.totals?.total || bill.amount || 0);
+    const busName = profile?.businessName || 'Sri Raani Dry Fruits Traders';
+
+    let msg = `Dear *${partyName}*,\n\n`;
+
+    if (currentTab === 'estimate') {
+      msg += `Thank you for your interest! Here is your Quotation *#${docNo}* from *${busName}*:\n\n` +
+        `Quotation Date: *${docDate}*\n` +
+        `Estimated Total: *${formatCurrency(total, profileCurrency)}*\n\n` +
+        `Please let us know if you approve this quotation so we can schedule delivery.\nThank you!`;
+    } else if (currentTab === 'sale-order') {
+      const adv = Number(bill.paidAmount || 0);
+      const bal = Math.max(0, total - adv);
+      msg += `Your Sale Order *#${docNo}* has been confirmed by *${busName}*!\n\n` +
+        `Order Date: *${docDate}*\n` +
+        `Total Order Value: *${formatCurrency(total, profileCurrency)}*\n` +
+        `Advance Received: *${formatCurrency(adv, profileCurrency)}*\n` +
+        `Balance Due: *${formatCurrency(bal, profileCurrency)}*\n\n` +
+        `We are preparing your items for dispatch. Thank you for your business!`;
+    } else if (currentTab === 'delivery-challan') {
+      msg += `Your goods have been dispatched under Delivery Challan *#${docNo}* from *${busName}*.\n\n` +
+        `Dispatch Date: *${docDate}*\n` +
+        `Challan Total: *${formatCurrency(total, profileCurrency)}*\n\n` +
+        `Please inspect the packages upon arrival and confirm receipt. Thank you!`;
+    } else {
+      msg += `Please find details for Tax Invoice *#${docNo}* from *${busName}*:\n\n` +
+        `Invoice Date: *${docDate}*\n` +
+        `Invoice Amount: *${formatCurrency(total, profileCurrency)}*\n\n` +
+        `Thank you for your prompt settlement!`;
+    }
+
+    openWhatsAppShare(phone, msg);
+    toast(`Opening WhatsApp share for ${partyName}`, 'info');
+  };
+
+  // Delete document
+  const handleDelete = async (bill) => {
+    const ok = await confirmAction({
+      title: `Delete ${activeConfig.singular}?`,
+      message: `Are you sure you want to delete ${activeConfig.singular} #${bill.invoiceNumber}? This action cannot be undone.`,
+      confirmLabel: 'Delete Document',
+      tone: 'danger',
+    });
+
+    if (!ok) return;
+
+    try {
+      await deleteBill(bill.id);
+      toast(`${activeConfig.singular} deleted successfully`, 'success');
+      loadData();
+    } catch {
+      toast('Failed to delete document', 'error');
+    }
+  };
+
+  // Export to CSV / Excel
+  const handleExportCSV = () => {
+    if (filteredBills.length === 0) {
+      toast('No records to export', 'warning');
+      return;
+    }
+
+    const headers = ['Date', 'Document No', 'Party Name', 'Document Type', 'Amount (INR)', 'Balance (INR)', 'Due Date', 'Status'];
+    const rows = filteredBills.map(b => [
+      b.invoiceDate || b.data?.details?.invoiceDate || '',
+      b.invoiceNumber || '',
+      `"${(b.clientName || b.data?.client?.name || '').replace(/"/g, '""')}"`,
+      activeConfig.singular,
+      Number(b.totalAmount || b.data?.totals?.total || b.amount || 0).toFixed(2),
+      Number(b.balanceAmount !== undefined ? b.balanceAmount : 0).toFixed(2),
+      b.dueDate || b.data?.details?.dueDate || '',
+      b.status || 'open',
+    ]);
+
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `${currentTab}_export_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast(`Exported ${filteredBills.length} records to CSV`, 'success');
+  };
+
+  // Format date helper
   const formatDateDisplay = (dateStr) => {
-    if (!dateStr) return '';
+    if (!dateStr) return '—';
     const parts = dateStr.split('-');
     if (parts.length === 3) {
       return `${parts[2]}/${parts[1]}/${parts[0]}`;
@@ -180,493 +431,569 @@ export default function SaleInvoicesView({ docType = 'tax-invoice', onNew, onEdi
     return dateStr;
   };
 
-  // Delete invoice
-  const handleDelete = async (bill) => {
-    const ok = await confirmAction({
-      title: 'Delete Invoice?',
-      message: `Are you sure you want to delete invoice ${bill.invoiceNumber}? This action cannot be undone.`,
-      confirmLabel: 'Delete',
-      danger: true,
-    });
-
-    if (!ok) return;
-
-    try {
-      await deleteBill(bill.id);
-      toast('Invoice deleted successfully', 'success');
-      loadData();
-    } catch {
-      toast('Failed to delete invoice', 'error');
-    }
-  };
-
-  // Export to CSV / Excel
-  const handleExportCSV = () => {
-    if (filteredBills.length === 0) {
-      toast('No data to export', 'error');
-      return;
-    }
-
-    const headers = ['Date', 'Invoice No', 'Party Name', 'Transaction Type', 'Payment Type', 'Amount (INR)', 'Balance (INR)', 'Due Date', 'Status'];
-    const rows = filteredBills.map(b => [
-      b.data?.details?.invoiceDate || '',
-      b.invoiceNumber || '',
-      `"${(b.data?.client?.name || '').replace(/"/g, '""')}"`,
-      INVOICE_TYPES[b.invoiceType || 'tax-invoice']?.label || 'Sale',
-      b.data?.invoiceOptions?.paymentMode || 'Cash/Bank',
-      (b.data?.totals?.total || b.amount || 0).toFixed(2),
-      (b.balanceAmount !== undefined ? b.balanceAmount : 0).toFixed(2),
-      b.data?.details?.dueDate || '',
-      b.status || 'unpaid',
-    ]);
-
-    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `${docType}_export_${new Date().toISOString().split('T')[0]}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    toast('Exported sales data to CSV', 'success');
-  };
-
-  // Print list
-  const handlePrintList = () => {
-    window.print();
-  };
-
   return (
-    <div style={{ padding: '1.25rem 1.5rem', background: 'var(--bg-main, #f8fafc)', minHeight: '100vh', color: 'var(--text-main, #0f172a)' }}>
-      {/* 1. TOP HEADER BAR */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '1rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <h1 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 700, color: 'var(--text-main, #0f172a)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-            {currentTypeConfig.label === 'Tax Invoice' ? 'Sale Invoices' : currentTypeConfig.label}
-            <ChevronDown size={18} style={{ opacity: 0.6, cursor: 'pointer' }} />
-          </h1>
+    <div className="view-container" style={{ display: 'flex', flexDirection: 'column', height: '100%', gap: '1rem' }}>
+      
+      {/* 1. DOCUMENT TABS SWITCHER (Quotations, Sale Orders, Challans, Proforma, Invoices) */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        flexWrap: 'wrap',
+        gap: '0.75rem',
+        background: 'var(--card-bg, #ffffff)',
+        padding: '0.75rem 1rem',
+        borderRadius: '10px',
+        border: '1px solid var(--border-color, #e5e7eb)'
+      }}>
+        {/* Document Tabs */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap' }}>
+          {Object.values(EXTENDED_DOC_CONFIGS).map(tab => {
+            const Icon = tab.icon;
+            const isActive = currentTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => {
+                  setCurrentTab(tab.id);
+                  setStatusFilter('all');
+                }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.4rem',
+                  padding: '0.45rem 0.85rem',
+                  borderRadius: '6px',
+                  fontSize: '0.84rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  border: 'none',
+                  background: isActive ? tab.accent : 'var(--bg-secondary, #f3f4f6)',
+                  color: isActive ? '#ffffff' : 'var(--text-secondary, #4b5563)',
+                  transition: 'all 0.15s ease'
+                }}>
+                <Icon size={15} />
+                {tab.label}
+              </button>
+            );
+          })}
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+        {/* Create New Document Action */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           <button
-            type="button"
-            className="btn"
+            onClick={() => onNew && onNew(currentTab)}
+            className="btn btn-primary"
             style={{
-              background: '#dc2626',
-              color: '#ffffff',
-              border: 'none',
-              borderRadius: '20px',
-              padding: '0.55rem 1.4rem',
-              fontWeight: 700,
-              fontSize: '0.9rem',
               display: 'flex',
               alignItems: 'center',
               gap: '0.4rem',
-              boxShadow: '0 2px 4px rgba(220, 38, 38, 0.25)',
-              cursor: 'pointer',
-              transition: 'transform 0.15s, background 0.15s',
-            }}
-            onClick={() => onNew && onNew(docType)}
-          >
-            <Plus size={18} /> Add Sale
-          </button>
-          <button
-            type="button"
-            className="icon-btn"
-            style={{ border: '1px solid var(--border, #e2e8f0)', padding: '0.55rem', borderRadius: '50%', background: '#ffffff' }}
-            title="Invoice Settings"
-          >
-            <Settings size={18} />
+              padding: '0.45rem 1.1rem',
+              fontWeight: 700,
+              fontSize: '0.84rem',
+              background: activeConfig.accent,
+              borderColor: activeConfig.accent
+            }}>
+            <Plus size={16} /> + Create {activeConfig.singular}
           </button>
         </div>
       </div>
 
-      {/* 2. FILTER BAR */}
+      {/* 2. TOP DYNAMIC KPI SUMMARY STRIP */}
       <div style={{
-        background: '#ffffff',
-        border: '1px solid var(--border, #e2e8f0)',
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))',
+        gap: '0.85rem'
+      }}>
+        {/* Total Document Value */}
+        <div style={{
+          background: 'var(--card-bg, #ffffff)',
+          border: '1px solid var(--border-color, #e5e7eb)',
+          borderRadius: '10px',
+          padding: '0.9rem 1.1rem',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.9rem'
+        }}>
+          <div style={{
+            width: '42px',
+            height: '42px',
+            borderRadius: '9px',
+            background: '#eff6ff',
+            color: activeConfig.accent,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0
+          }}>
+            <FileText size={22} />
+          </div>
+          <div>
+            <div style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-secondary, #6b7280)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              Total {activeConfig.singular} Value
+            </div>
+            <div style={{ fontSize: '1.4rem', fontWeight: 700, color: activeConfig.accent, lineHeight: 1.2 }}>
+              {formatCurrency(kpiStats.totalValue, profileCurrency)}
+            </div>
+            <div style={{ fontSize: '0.72rem', color: '#6b7280', marginTop: '2px' }}>
+              Across {kpiStats.count} {activeConfig.label.toLowerCase()}
+            </div>
+          </div>
+        </div>
+
+        {/* Dynamic Card 2: Open / Pending */}
+        <div style={{
+          background: 'var(--card-bg, #ffffff)',
+          border: '1px solid var(--border-color, #e5e7eb)',
+          borderRadius: '10px',
+          padding: '0.9rem 1.1rem',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.9rem'
+        }}>
+          <div style={{
+            width: '42px',
+            height: '42px',
+            borderRadius: '9px',
+            background: '#fff7ed',
+            color: '#ea580c',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0
+          }}>
+            <Clock size={22} />
+          </div>
+          <div>
+            <div style={{ fontSize: '0.72rem', fontWeight: 600, color: '#9a3412', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              {currentTab === 'sale-order' ? 'Active Orders' : (currentTab === 'delivery-challan' ? 'In-Transit / Open' : 'Open / Pending')}
+            </div>
+            <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#ea580c', lineHeight: 1.2 }}>
+              {kpiStats.openCount} {activeConfig.singular}s
+            </div>
+            <div style={{ fontSize: '0.72rem', color: '#6b7280', marginTop: '2px' }}>
+              Awaiting fulfillment or approval
+            </div>
+          </div>
+        </div>
+
+        {/* Dynamic Card 3: Converted to Invoice / Delivered */}
+        <div style={{
+          background: 'var(--card-bg, #ffffff)',
+          border: '1px solid var(--border-color, #e5e7eb)',
+          borderRadius: '10px',
+          padding: '0.9rem 1.1rem',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.9rem'
+        }}>
+          <div style={{
+            width: '42px',
+            height: '42px',
+            borderRadius: '9px',
+            background: '#ecfdf5',
+            color: '#059669',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0
+          }}>
+            <CheckCircle2 size={22} />
+          </div>
+          <div>
+            <div style={{ fontSize: '0.72rem', fontWeight: 600, color: '#065f46', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              {currentTab === 'tax-invoice' ? 'Amount Received' : 'Converted to Tax Invoice'}
+            </div>
+            <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#059669', lineHeight: 1.2 }}>
+              {currentTab === 'tax-invoice'
+                ? formatCurrency(kpiStats.receivedOrAdvance, profileCurrency)
+                : `${kpiStats.convertedCount} Converted (${kpiStats.conversionRate.toFixed(0)}%)`}
+            </div>
+            <div style={{ fontSize: '0.72rem', color: '#6b7280', marginTop: '2px' }}>
+              {currentTab === 'tax-invoice' ? 'Settled payments' : 'Successfully invoiced'}
+            </div>
+          </div>
+        </div>
+
+        {/* Dynamic Card 4: Pending Balance / Shipped Qty */}
+        <div style={{
+          background: 'var(--card-bg, #ffffff)',
+          border: '1px solid var(--border-color, #e5e7eb)',
+          borderRadius: '10px',
+          padding: '0.9rem 1.1rem',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.9rem'
+        }}>
+          <div style={{
+            width: '42px',
+            height: '42px',
+            borderRadius: '9px',
+            background: currentTab === 'delivery-challan' ? '#eff6ff' : '#fff1f2',
+            color: currentTab === 'delivery-challan' ? '#2563eb' : '#e11d48',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0
+          }}>
+            {currentTab === 'delivery-challan' ? <Truck size={22} /> : <Zap size={22} />}
+          </div>
+          <div>
+            <div style={{ fontSize: '0.72rem', fontWeight: 600, color: currentTab === 'delivery-challan' ? '#1e40af' : '#9f1239', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              {currentTab === 'delivery-challan' ? 'Total Units Dispatched' : 'Balance Pending Settlement'}
+            </div>
+            <div style={{ fontSize: '1.4rem', fontWeight: 700, color: currentTab === 'delivery-challan' ? '#2563eb' : '#e11d48', lineHeight: 1.2 }}>
+              {currentTab === 'delivery-challan'
+                ? `${kpiStats.totalItemsQty.toLocaleString('en-IN')} Units`
+                : formatCurrency(kpiStats.pendingBalance, profileCurrency)}
+            </div>
+            <div style={{ fontSize: '0.72rem', color: '#6b7280', marginTop: '2px' }}>
+              {currentTab === 'delivery-challan' ? 'Goods in movement' : 'Due from customers'}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 3. TOOLBAR CONTROLS: PERIOD, SEARCH, STATUS FILTER, EXPORT */}
+      <div style={{
+        background: 'var(--card-bg, #ffffff)',
+        border: '1px solid var(--border-color, #e5e7eb)',
         borderRadius: '10px',
         padding: '0.75rem 1rem',
-        marginBottom: '1.25rem',
         display: 'flex',
         alignItems: 'center',
-        gap: '1rem',
+        justifyContent: 'space-between',
         flexWrap: 'wrap',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
+        gap: '0.75rem'
       }}>
-        <span style={{ fontSize: '0.88rem', fontWeight: 700, color: '#334155' }}>Filter by :</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+          {/* Search Box */}
+          <div className="search-box" style={{ width: '260px' }}>
+            <Search size={15} className="search-icon" />
+            <input
+              type="text"
+              placeholder={`Search ${activeConfig.singular.toLowerCase()} or party...`}
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="search-input"
+            />
+            {search && (
+              <button className="icon-btn" onClick={() => setSearch('')}>
+                <X size={13} />
+              </button>
+            )}
+          </div>
 
-        {/* Period Filter Dropdown */}
-        <select
-          value={periodFilter}
-          onChange={e => setPeriodFilter(e.target.value)}
-          style={{
-            width: 'auto',
-            padding: '0.45rem 2rem 0.45rem 0.85rem',
-            fontSize: '0.85rem',
-            fontWeight: 700,
-            borderRadius: '20px',
-            background: '#f8fafc',
-            border: '1px solid #cbd5e1',
-            color: '#0f172a',
-            cursor: 'pointer',
-            outline: 'none',
-          }}
-        >
-          <option value="this_month" style={{ color: '#0f172a', background: '#ffffff', fontWeight: 600 }}>This Month</option>
-          <option value="today" style={{ color: '#0f172a', background: '#ffffff', fontWeight: 600 }}>Today</option>
-          <option value="this_week" style={{ color: '#0f172a', background: '#ffffff', fontWeight: 600 }}>This Week</option>
-          <option value="this_quarter" style={{ color: '#0f172a', background: '#ffffff', fontWeight: 600 }}>This Quarter</option>
-          <option value="this_financial_year" style={{ color: '#0f172a', background: '#ffffff', fontWeight: 600 }}>This Financial Year</option>
-          <option value="all" style={{ color: '#0f172a', background: '#ffffff', fontWeight: 600 }}>All Time</option>
-          {periodFilter === 'custom' && <option value="custom" style={{ color: '#0f172a', background: '#ffffff', fontWeight: 600 }}>Custom Range</option>}
-        </select>
+          {/* Period Filter Dropdown */}
+          <select
+            value={periodFilter}
+            onChange={e => setPeriodFilter(e.target.value)}
+            className="form-input"
+            style={{ width: 'auto', padding: '0.35rem 0.65rem', fontSize: '0.82rem', height: '34px' }}
+          >
+            <option value="this_month">This Month</option>
+            <option value="today">Today</option>
+            <option value="this_week">This Week</option>
+            <option value="this_quarter">This Quarter</option>
+            <option value="this_financial_year">This Financial Year</option>
+            <option value="all">All Time</option>
+            {periodFilter === 'custom' && <option value="custom">Custom Range</option>}
+          </select>
 
-        {/* Date Range Display Box with Popover */}
-        <div style={{ position: 'relative' }}>
+          {/* Date Picker Button */}
           <button
             type="button"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              background: '#f8fafc',
-              border: '1px solid #cbd5e1',
-              padding: '0.45rem 0.85rem',
-              borderRadius: '20px',
-              fontSize: '0.83rem',
-              fontWeight: 700,
-              color: '#0f172a',
-              cursor: 'pointer',
-            }}
+            className="btn btn-secondary"
+            style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', padding: '0.35rem 0.65rem', fontSize: '0.82rem', height: '34px' }}
             onClick={() => setShowDatePicker(v => !v)}
           >
-            <span>📅 {formatDateDisplay(dateFrom) || 'Start'}</span>
-            <span style={{ color: '#64748b', fontWeight: 500 }}>To</span>
-            <span>{formatDateDisplay(dateTo) || 'End'}</span>
-            <ChevronDown size={14} style={{ color: '#64748b' }} />
+            <Calendar size={14} />
+            <span>{formatDateDisplay(dateFrom)} – {formatDateDisplay(dateTo)}</span>
+            <ChevronDown size={13} />
           </button>
 
+          {/* Custom Date Modal / Popover */}
           {showDatePicker && (
             <div style={{
               position: 'absolute',
-              top: 'calc(100% + 6px)',
-              left: 0,
+              top: '240px',
+              left: '320px',
               zIndex: 100,
               background: '#ffffff',
               border: '1px solid #cbd5e1',
-              borderRadius: '12px',
+              borderRadius: '10px',
               padding: '1rem',
               boxShadow: '0 10px 25px rgba(0,0,0,0.15)',
-              minWidth: '280px',
+              minWidth: '260px'
             }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-                <span style={{ fontWeight: 700, fontSize: '0.88rem', color: '#0f172a' }}>Select Custom Dates</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.65rem' }}>
+                <span style={{ fontWeight: 700, fontSize: '0.85rem' }}>Select Custom Range</span>
                 <X size={15} style={{ cursor: 'pointer', color: '#64748b' }} onClick={() => setShowDatePicker(false)} />
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                 <div>
-                  <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '3px' }}>From Date</label>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 600, display: 'block', marginBottom: '2px' }}>From Date</label>
                   <input
                     type="date"
                     className="form-input"
                     value={dateFrom}
-                    onChange={e => {
-                      setDateFrom(e.target.value);
-                      setPeriodFilter('custom');
-                    }}
-                    style={{ width: '100%', fontSize: '0.83rem', color: '#0f172a', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '0.4rem' }}
+                    onChange={e => { setDateFrom(e.target.value); setPeriodFilter('custom'); }}
                   />
                 </div>
                 <div>
-                  <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '3px' }}>To Date</label>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 600, display: 'block', marginBottom: '2px' }}>To Date</label>
                   <input
                     type="date"
                     className="form-input"
                     value={dateTo}
-                    onChange={e => {
-                      setDateTo(e.target.value);
-                      setPeriodFilter('custom');
-                    }}
-                    style={{ width: '100%', fontSize: '0.83rem', color: '#0f172a', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '0.4rem' }}
+                    onChange={e => { setDateTo(e.target.value); setPeriodFilter('custom'); }}
                   />
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '0.5rem' }}>
-                  <button
-                    type="button"
-                    className="btn btn-primary"
-                    style={{ padding: '0.35rem 0.85rem', fontSize: '0.8rem', fontWeight: 700, background: '#2563eb' }}
-                    onClick={() => setShowDatePicker(false)}
-                  >
-                    Apply Filter
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  style={{ marginTop: '0.4rem', fontSize: '0.8rem', padding: '0.35rem' }}
+                  onClick={() => setShowDatePicker(false)}
+                >
+                  Apply Dates
+                </button>
               </div>
             </div>
           )}
-        </div>
 
-        {/* Firm Filter Dropdown */}
-        <select
-          value={selectedFirm}
-          onChange={e => setSelectedFirm(e.target.value)}
-          style={{
-            width: 'auto',
-            padding: '0.45rem 2rem 0.45rem 0.85rem',
-            fontSize: '0.85rem',
-            fontWeight: 700,
-            borderRadius: '20px',
-            background: '#f8fafc',
-            border: '1px solid #cbd5e1',
-            color: '#0f172a',
-            cursor: 'pointer',
-            outline: 'none',
-          }}
-        >
-          <option value="all" style={{ color: '#0f172a', background: '#ffffff', fontWeight: 600 }}>All Firms</option>
-          {firms.map((f, i) => (
-            <option key={f.id || i} value={f.id} style={{ color: '#0f172a', background: '#ffffff', fontWeight: 600 }}>{f.businessName || `Firm ${i + 1}`}</option>
-          ))}
-        </select>
-      </div>
-
-      {/* 3. TOTAL SALES KPI CARD CONTAINER */}
-      <div style={{
-        background: '#ffffff',
-        border: '1px solid var(--border, #e2e8f0)',
-        borderRadius: '12px',
-        padding: '1.25rem 1.5rem',
-        marginBottom: '1.5rem',
-        maxWidth: '380px',
-        boxShadow: '0 2px 4px rgba(0,0,0,0.02)',
-      }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
-          <span style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--text-muted, #64748b)' }}>Total Sales Amount</span>
-          <span style={{
-            background: '#f1f5f9',
-            color: '#475569',
-            padding: '2px 8px',
-            borderRadius: '12px',
-            fontSize: '0.75rem',
-            fontWeight: 700,
-            display: 'flex',
-            alignItems: 'center',
-            gap: '2px',
-          }}>
-            0% ↗ vs last month
-          </span>
-        </div>
-
-        <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#0f172a', marginBottom: '1rem' }}>
-          {formatCurrency(stats.totalSales, 'INR')}
-        </div>
-
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '1.5rem',
-          paddingTop: '0.75rem',
-          borderTop: '1px solid var(--border, #f1f5f9)',
-          fontSize: '0.85rem',
-          fontWeight: 600,
-        }}>
-          <div>
-            <span style={{ color: 'var(--text-muted, #64748b)' }}>Received: </span>
-            <span style={{ color: '#059669', fontWeight: 700 }}>{formatCurrency(stats.received, 'INR')}</span>
-          </div>
-          <div style={{ height: '14px', width: '1px', background: '#cbd5e1' }} />
-          <div>
-            <span style={{ color: 'var(--text-muted, #64748b)' }}>Balance: </span>
-            <span style={{ color: '#dc2626', fontWeight: 700 }}>{formatCurrency(stats.balance, 'INR')}</span>
-          </div>
-        </div>
-      </div>
-
-      {/* 4. TRANSACTIONS SECTION */}
-      <div style={{
-        background: '#ffffff',
-        border: '1px solid var(--border, #e2e8f0)',
-        borderRadius: '12px',
-        padding: '1.25rem',
-        boxShadow: '0 2px 4px rgba(0,0,0,0.02)',
-      }}>
-        {/* Section Header Toolbar */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.75rem' }}>
-          <h2 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700, color: '#0f172a' }}>Transactions</h2>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            {/* Search Input Toggle */}
-            {showSearchBox ? (
-              <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                <Search size={15} style={{ position: 'absolute', left: '10px', color: '#94a3b8' }} />
-                <input
-                  type="text"
-                  className="form-input"
-                  placeholder="Search invoice or party..."
-                  value={search}
-                  onChange={e => setSearch(e.target.value)}
-                  style={{ paddingLeft: '2rem', paddingRight: '2rem', height: '34px', fontSize: '0.83rem', width: '220px' }}
-                  autoFocus
-                />
-                <X size={14} style={{ position: 'absolute', right: '10px', cursor: 'pointer', color: '#94a3b8' }} onClick={() => { setSearch(''); setShowSearchBox(false); }} />
-              </div>
-            ) : (
-              <button type="button" className="icon-btn" title="Search Transactions" onClick={() => setShowSearchBox(true)}>
-                <Search size={18} />
+          {/* Status Filter Pills */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+            <button
+              onClick={() => setStatusFilter('all')}
+              style={{
+                padding: '0.3rem 0.6rem',
+                borderRadius: '6px',
+                fontSize: '0.76rem',
+                fontWeight: 600,
+                cursor: 'pointer',
+                border: '1px solid ' + (statusFilter === 'all' ? '#2563eb' : 'var(--border-color, #e5e7eb)'),
+                background: statusFilter === 'all' ? '#eff6ff' : 'var(--card-bg, #ffffff)',
+                color: statusFilter === 'all' ? '#2563eb' : 'var(--text-secondary, #4b5563)'
+              }}>
+              All
+            </button>
+            {activeConfig.statusOptions.map(opt => (
+              <button
+                key={opt.id}
+                onClick={() => setStatusFilter(opt.id)}
+                style={{
+                  padding: '0.3rem 0.6rem',
+                  borderRadius: '6px',
+                  fontSize: '0.76rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  border: '1px solid ' + (statusFilter === opt.id ? opt.color : 'var(--border-color, #e5e7eb)'),
+                  background: statusFilter === opt.id ? opt.bg : 'var(--card-bg, #ffffff)',
+                  color: statusFilter === opt.id ? opt.color : 'var(--text-secondary, #4b5563)'
+                }}>
+                {opt.label}
               </button>
-            )}
-
-            {/* Excel Export Button */}
-            <button
-              type="button"
-              className="btn"
-              style={{ background: '#10b981', color: '#ffffff', border: 'none', padding: '0.4rem 0.75rem', fontSize: '0.8rem', fontWeight: 700, borderRadius: '6px', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
-              onClick={handleExportCSV}
-              title="Export to Excel / CSV"
-            >
-              <Download size={15} /> XLS
-            </button>
-
-            {/* Print Button */}
-            <button
-              type="button"
-              className="icon-btn"
-              title="Print Transactions List"
-              onClick={handlePrintList}
-            >
-              <Printer size={18} />
-            </button>
+            ))}
           </div>
         </div>
 
-        {/* Transactions Table */}
-        {filteredBills.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '4rem 1rem', color: 'var(--text-muted, #64748b)' }}>
-            <div style={{
-              width: '56px',
-              height: '56px',
-              borderRadius: '50%',
-              background: '#fef2f2',
-              color: '#dc2626',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              margin: '0 auto 1rem',
-            }}>
-              <AlertTriangle size={28} />
+        {/* Right Tools: Export CSV, Refresh */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+          <button
+            onClick={handleExportCSV}
+            className="btn btn-secondary"
+            style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', padding: '0.35rem 0.75rem', fontSize: '0.8rem', fontWeight: 600 }}>
+            <Download size={14} /> Export CSV
+          </button>
+
+          <button
+            onClick={loadData}
+            title="Refresh List"
+            className="icon-btn"
+            style={{ width: '34px', height: '34px', borderRadius: '6px', border: '1px solid var(--border-color, #e5e7eb)' }}>
+            <RefreshCw size={14} />
+          </button>
+        </div>
+      </div>
+
+      {/* 4. MAIN DOCUMENTS TABLE */}
+      <div className="glass-panel" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', padding: '1.25rem' }}>
+        <div style={{ flex: 1, overflowY: 'auto' }}>
+          {filteredBills.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '4rem 1rem', color: 'var(--text-muted)' }}>
+              <div style={{
+                width: '56px',
+                height: '56px',
+                borderRadius: '50%',
+                background: '#eff6ff',
+                color: activeConfig.accent,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                margin: '0 auto 1rem',
+              }}>
+                <FileText size={28} />
+              </div>
+              <h3 style={{ margin: '0 0 0.35rem 0', fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                No {activeConfig.label} Found
+              </h3>
+              <p style={{ margin: 0, fontSize: '0.84rem' }}>
+                There are no {activeConfig.label.toLowerCase()} matching your filter criteria.
+              </p>
+              <button
+                onClick={() => onNew && onNew(currentTab)}
+                className="btn btn-primary"
+                style={{ marginTop: '1rem', background: activeConfig.accent, borderColor: activeConfig.accent }}>
+                <Plus size={15} /> Create First {activeConfig.singular}
+              </button>
             </div>
-            <h3 style={{ margin: '0 0 0.4rem 0', fontSize: '1.05rem', fontWeight: 700, color: '#1e293b' }}>No Transaction Found</h3>
-            <p style={{ margin: 0, fontSize: '0.85rem', color: '#64748b' }}>We could not find any transactions for the selected filters.</p>
-          </div>
-        ) : (
-          <div className="table-responsive" style={{ overflowX: 'auto' }}>
-            <table className="table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+          ) : (
+            <table className="data-table" style={{ width: '100%', marginBottom: 0 }}>
               <thead>
-                <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#475569', textAlign: 'left' }}>
-                  <th style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                      Date <Filter size={13} style={{ opacity: 0.5, cursor: 'pointer' }} />
-                    </div>
-                  </th>
-                  <th style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                      Invoice no <Filter size={13} style={{ opacity: 0.5, cursor: 'pointer' }} />
-                    </div>
-                  </th>
-                  <th style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                      Party Name <Filter size={13} style={{ opacity: 0.5, cursor: 'pointer' }} />
-                    </div>
-                  </th>
-                  <th style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                      Transaction <Filter size={13} style={{ opacity: 0.5, cursor: 'pointer' }} />
-                    </div>
-                  </th>
-                  <th style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                      Payment Type <Filter size={13} style={{ opacity: 0.5, cursor: 'pointer' }} />
-                    </div>
-                  </th>
-                  <th style={{ padding: '0.75rem 1rem', fontWeight: 600, textAlign: 'right' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.3rem' }}>
-                      Amount <Filter size={13} style={{ opacity: 0.5, cursor: 'pointer' }} />
-                    </div>
-                  </th>
-                  <th style={{ padding: '0.75rem 1rem', fontWeight: 600, textAlign: 'right' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.3rem' }}>
-                      Balance <Filter size={13} style={{ opacity: 0.5, cursor: 'pointer' }} />
-                    </div>
-                  </th>
-                  <th style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                      Due date <Filter size={13} style={{ opacity: 0.5, cursor: 'pointer' }} />
-                    </div>
-                  </th>
-                  <th style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                      Status <Filter size={13} style={{ opacity: 0.5, cursor: 'pointer' }} />
-                    </div>
-                  </th>
-                  <th style={{ padding: '0.75rem 1rem', fontWeight: 600, textAlign: 'right' }}>Actions</th>
+                <tr>
+                  <th>Date</th>
+                  <th>{activeConfig.singular} No</th>
+                  <th>Party Name</th>
+                  <th>Items Summary</th>
+                  <th style={{ textAlign: 'right' }}>Total Amount</th>
+                  <th style={{ textAlign: 'right' }}>Balance Due</th>
+                  <th>Valid / Delivery Date</th>
+                  <th>Lifecycle Status</th>
+                  <th style={{ textAlign: 'center' }}>1-Click Convert</th>
+                  <th style={{ textAlign: 'right' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredBills.map((bill) => {
-                  const total = Number(bill.data?.totals?.total || bill.amount || 0);
+                {filteredBills.map(bill => {
+                  const total = Number(bill.totalAmount || bill.data?.totals?.total || bill.amount || 0);
                   const paid = Number(bill.paidAmount || (bill.status === 'paid' ? total : 0));
-                  const balance = Number(bill.balanceAmount !== undefined ? bill.balanceAmount : (total - paid));
-                  const status = bill.status || 'unpaid';
+                  const balance = Number(bill.balanceAmount !== undefined ? bill.balanceAmount : Math.max(0, total - paid));
+                  const bStatus = bill.status || 'open';
+                  const statusObj = activeConfig.statusOptions.find(o => o.id === bStatus) || { label: bStatus, color: '#4b5563', bg: '#f3f4f6' };
+                  const isConverted = bStatus === 'converted' || bStatus === 'completed' || bStatus === 'invoiced';
+
+                  const items = bill.data?.items || bill.items || [];
+                  const itemsSummary = items.length > 0
+                    ? items.map(it => `${it.name || it.description} (${it.quantity || 1})`).slice(0, 2).join(', ') + (items.length > 2 ? ` +${items.length - 2} more` : '')
+                    : '—';
 
                   return (
-                    <tr key={bill.id} style={{ borderBottom: '1px solid #f1f5f9', transition: 'background 0.15s' }}>
-                      <td style={{ padding: '0.75rem 1rem', fontWeight: 500 }}>
-                        {formatDateDisplay(bill.data?.details?.invoiceDate || bill.createdAt?.split('T')[0])}
+                    <tr key={bill.id}>
+                      <td className="text-muted">
+                        {formatDateDisplay(bill.invoiceDate || bill.data?.details?.invoiceDate || bill.createdAt?.split('T')[0])}
                       </td>
-                      <td style={{ padding: '0.75rem 1rem', fontWeight: 700, color: 'var(--primary, #2563eb)' }}>
-                        {bill.invoiceNumber || 'INV-0001'}
-                      </td>
-                      <td style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>
-                        {bill.data?.client?.name || 'Walk-in Client'}
-                      </td>
-                      <td style={{ padding: '0.75rem 1rem', color: '#475569' }}>
-                        {INVOICE_TYPES[bill.invoiceType || 'tax-invoice']?.label || 'Sale Invoice'}
-                      </td>
-                      <td style={{ padding: '0.75rem 1rem', color: '#64748b' }}>
-                        {bill.data?.invoiceOptions?.paymentMode || 'Cash / Online'}
-                      </td>
-                      <td style={{ padding: '0.75rem 1rem', textAlign: 'right', fontWeight: 700 }}>
-                        {formatCurrency(total, bill.currency || 'INR')}
-                      </td>
-                      <td style={{ padding: '0.75rem 1rem', textAlign: 'right', fontWeight: 600, color: balance > 0 ? '#dc2626' : '#059669' }}>
-                        {formatCurrency(Math.max(0, balance), bill.currency || 'INR')}
-                      </td>
-                      <td style={{ padding: '0.75rem 1rem', color: '#64748b' }}>
-                        {formatDateDisplay(bill.data?.details?.dueDate) || '-'}
-                      </td>
-                      <td style={{ padding: '0.75rem 1rem' }}>
-                        <span style={{
-                          padding: '3px 8px',
-                          borderRadius: '12px',
-                          fontSize: '0.72rem',
-                          fontWeight: 700,
-                          textTransform: 'uppercase',
-                          background: status === 'paid' ? '#dcfce7' : status === 'overdue' ? '#fee2e2' : '#fef3c7',
-                          color: status === 'paid' ? '#166534' : status === 'overdue' ? '#991b1b' : '#92400e',
-                        }}>
-                          {status}
+                      <td className="font-medium">
+                        <span className="invoice-badge" style={{ color: activeConfig.accent, borderColor: activeConfig.accent }}>
+                          {bill.invoiceNumber || 'DOC-001'}
                         </span>
                       </td>
-                      <td style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>
-                        <div style={{ display: 'flex', gap: '0.35rem', justifyContent: 'flex-end' }}>
+                      <td className="font-medium">
+                        <div>{bill.clientName || bill.data?.client?.name || 'Walk-in Customer'}</div>
+                        {(bill.data?.client?.phone || bill.clientPhone) && (
+                          <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
+                            📞 {bill.data?.client?.phone || bill.clientPhone}
+                          </div>
+                        )}
+                      </td>
+                      <td style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', maxWidth: '200px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {itemsSummary}
+                      </td>
+                      <td style={{ textAlign: 'right', fontWeight: 700 }}>
+                        {formatCurrency(total, profileCurrency)}
+                      </td>
+                      <td style={{ textAlign: 'right', fontWeight: 600, color: balance > 0 ? '#dc2626' : '#059669' }}>
+                        {formatCurrency(balance, profileCurrency)}
+                      </td>
+                      <td className="text-muted" style={{ fontSize: '0.8rem' }}>
+                        {formatDateDisplay(bill.dueDate || bill.data?.details?.dueDate || bill.deliveryDate)}
+                      </td>
+                      <td>
+                        {/* Status Dropdown Pill */}
+                        <select
+                          value={bStatus}
+                          onChange={e => handleUpdateStatus(bill, e.target.value)}
+                          style={{
+                            padding: '0.2rem 0.5rem',
+                            borderRadius: '12px',
+                            fontSize: '0.74rem',
+                            fontWeight: 700,
+                            border: '1px solid ' + statusObj.color,
+                            background: statusObj.bg,
+                            color: statusObj.color,
+                            cursor: 'pointer',
+                            outline: 'none'
+                          }}>
+                          {activeConfig.statusOptions.map(opt => (
+                            <option key={opt.id} value={opt.id} style={{ background: '#ffffff', color: '#0f172a' }}>
+                              {opt.label}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
+
+                      {/* 1-Click Convert to Tax Invoice Column */}
+                      <td style={{ textAlign: 'center' }}>
+                        {currentTab !== 'tax-invoice' ? (
+                          <button
+                            onClick={() => handleConvertClick(bill)}
+                            className="btn btn-secondary"
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.3rem',
+                              padding: '0.25rem 0.65rem',
+                              fontSize: '0.76rem',
+                              fontWeight: 700,
+                              background: isConverted ? '#f0fdf4' : '#eff6ff',
+                              borderColor: isConverted ? '#86efac' : '#bfdbfe',
+                              color: isConverted ? '#16a34a' : '#2563eb'
+                            }}>
+                            <Zap size={13} /> {isConverted ? 'Re-Convert' : 'Convert to Invoice'}
+                          </button>
+                        ) : (
+                          <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>Official Invoice</span>
+                        )}
+                      </td>
+
+                      {/* Action Shortcuts */}
+                      <td style={{ textAlign: 'right' }}>
+                        <div style={{ display: 'flex', gap: '0.35rem', justifyContent: 'flex-end', alignItems: 'center' }}>
+                          {/* WhatsApp Share */}
                           <button
                             type="button"
                             className="icon-btn"
-                            title="Edit Invoice"
+                            title="Share on WhatsApp"
+                            onClick={() => handleWhatsAppShare(bill)}
+                            style={{ color: '#059669' }}
+                          >
+                            <MessageCircle size={15} />
+                          </button>
+
+                          {/* Quick View / Preview */}
+                          <button
+                            type="button"
+                            className="icon-btn"
+                            title="Quick Preview"
+                            onClick={() => setPreviewBill(bill)}
+                          >
+                            <Eye size={15} />
+                          </button>
+
+                          {/* Edit */}
+                          <button
+                            type="button"
+                            className="icon-btn"
+                            title="Edit"
                             onClick={() => onEdit && onEdit(bill)}
                           >
                             <Pencil size={15} />
                           </button>
+
+                          {/* Duplicate */}
                           <button
                             type="button"
                             className="icon-btn"
@@ -675,6 +1002,8 @@ export default function SaleInvoicesView({ docType = 'tax-invoice', onNew, onEdi
                           >
                             <Copy size={15} />
                           </button>
+
+                          {/* Delete */}
                           <button
                             type="button"
                             className="icon-btn text-danger"
@@ -690,9 +1019,157 @@ export default function SaleInvoicesView({ docType = 'tax-invoice', onNew, onEdi
                 })}
               </tbody>
             </table>
-          </div>
-        )}
+          )}
+        </div>
       </div>
+
+      {/* 5. FAST VIEW / PREVIEW MODAL */}
+      {previewBill && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0,0,0,0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+          padding: '1rem'
+        }}>
+          <div style={{
+            background: '#ffffff',
+            borderRadius: '12px',
+            width: '100%',
+            maxWidth: '650px',
+            maxHeight: '90vh',
+            display: 'flex',
+            flexDirection: 'column',
+            boxShadow: '0 20px 25px -5px rgba(0,0,0,0.2)',
+            overflow: 'hidden'
+          }}>
+            {/* Modal Header */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '1rem 1.25rem',
+              borderBottom: '1px solid var(--border-color, #e5e7eb)',
+              background: 'var(--bg-secondary, #f8fafc)'
+            }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700 }}>
+                  {activeConfig.singular} #{previewBill.invoiceNumber}
+                </h3>
+                <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                  Date: {formatDateDisplay(previewBill.invoiceDate || previewBill.data?.details?.invoiceDate)}
+                </span>
+              </div>
+              <button className="icon-btn" onClick={() => setPreviewBill(null)}>
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div style={{ padding: '1.25rem', flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              {/* Party Information */}
+              <div style={{ background: '#f8fafc', padding: '0.75rem 1rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+                  Customer / Client Details
+                </div>
+                <div style={{ fontSize: '0.98rem', fontWeight: 700, marginTop: '2px' }}>
+                  {previewBill.clientName || previewBill.data?.client?.name || 'Walk-in Customer'}
+                </div>
+                {(previewBill.data?.client?.phone || previewBill.clientPhone) && (
+                  <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
+                    Phone: {previewBill.data?.client?.phone || previewBill.clientPhone}
+                  </div>
+                )}
+                {(previewBill.data?.client?.address || previewBill.clientAddress) && (
+                  <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+                    Address: {previewBill.data?.client?.address || previewBill.clientAddress}
+                  </div>
+                )}
+              </div>
+
+              {/* Items Table */}
+              <div>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.84rem' }}>
+                  <thead>
+                    <tr style={{ background: '#f1f5f9', borderBottom: '1px solid #cbd5e1' }}>
+                      <th style={{ padding: '0.5rem', textAlign: 'left' }}>Item</th>
+                      <th style={{ padding: '0.5rem', textAlign: 'right' }}>Qty</th>
+                      <th style={{ padding: '0.5rem', textAlign: 'right' }}>Rate</th>
+                      <th style={{ padding: '0.5rem', textAlign: 'right' }}>Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(previewBill.data?.items || previewBill.items || []).map((it, idx) => (
+                      <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                        <td style={{ padding: '0.5rem', fontWeight: 600 }}>{it.name || it.description}</td>
+                        <td style={{ padding: '0.5rem', textAlign: 'right' }}>{it.quantity || 1} {it.unit || ''}</td>
+                        <td style={{ padding: '0.5rem', textAlign: 'right' }}>{formatCurrency(it.rate || it.price || 0, profileCurrency)}</td>
+                        <td style={{ padding: '0.5rem', textAlign: 'right', fontWeight: 600 }}>
+                          {formatCurrency((it.quantity || 1) * (it.rate || it.price || 0), profileCurrency)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Totals Breakdown */}
+              <div style={{ alignSelf: 'flex-end', width: '240px', display: 'flex', flexDirection: 'column', gap: '0.35rem', fontSize: '0.85rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: 'var(--text-muted)' }}>Subtotal:</span>
+                  <span style={{ fontWeight: 600 }}>{formatCurrency(previewBill.totalAmount || previewBill.amount || 0, profileCurrency)}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1.5px solid #cbd5e1', paddingTop: '0.35rem', fontSize: '1rem', fontWeight: 800 }}>
+                  <span>Total:</span>
+                  <span style={{ color: activeConfig.accent }}>{formatCurrency(previewBill.totalAmount || previewBill.amount || 0, profileCurrency)}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '0.85rem 1.25rem',
+              borderTop: '1px solid var(--border-color, #e5e7eb)',
+              background: 'var(--bg-secondary, #f8fafc)'
+            }}>
+              <button
+                onClick={() => handleWhatsAppShare(previewBill)}
+                className="btn btn-secondary"
+                style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', color: '#059669', fontSize: '0.82rem' }}>
+                <MessageCircle size={15} /> WhatsApp
+              </button>
+
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                {currentTab !== 'tax-invoice' && (
+                  <button
+                    onClick={() => {
+                      const b = previewBill;
+                      setPreviewBill(null);
+                      handleConvertClick(b);
+                    }}
+                    className="btn btn-primary"
+                    style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.82rem', background: '#2563eb' }}>
+                    <Zap size={14} /> Convert to Invoice
+                  </button>
+                )}
+                <button
+                  onClick={() => setPreviewBill(null)}
+                  className="btn btn-secondary"
+                  style={{ fontSize: '0.82rem' }}>
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

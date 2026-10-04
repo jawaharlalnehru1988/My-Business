@@ -21,4 +21,7 @@ public class TermsTemplate {
 
     @Column(columnDefinition = "TEXT")
     private String content;
+
+    @Column(name = "extra_json", columnDefinition = "TEXT")
+    private String extraJson;
 }

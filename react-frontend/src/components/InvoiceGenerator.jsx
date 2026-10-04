@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react';
-import { ArrowLeft, Plus, Trash2, Download, UserPlus, Pencil, Settings, ChevronUp, ChevronDown, MessageCircle, Check, Loader, Truck, Printer, Eye } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Download, UserPlus, Pencil, Settings, ChevronUp, ChevronDown, MessageCircle, Check, Loader, Truck, Printer, Eye, ScanBarcode, Barcode, IndianRupee, Zap } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
 import { saveBill, getNextInvoiceNumber, getTermsTemplates, getAllClients, saveClient, getProfile, getAllProducts, saveProduct, getInvoiceDisplayOptions, saveInvoiceDisplayOptions, getAllProfiles, getRegionMode, saveRecurring, getAllBills, saveSupplier } from '../store';
@@ -212,6 +212,7 @@ const LineItem = memo(function LineItem({
   currency, profileCountry, suggestions,
   onFieldChange, onSelectProduct, onSetProductSearch,
   onAddCustomUnit, onRemoveCustomUnit, onRemove, clampNonNeg,
+  isLastItem, onAddItem,
 }) {
   return (
     <div className="line-item-row" data-item-id={item.id}>
@@ -220,18 +221,56 @@ const LineItem = memo(function LineItem({
         <input type="text" className="form-input" value={item.name}
           onChange={(e) => onFieldChange(item.id, 'name', e.target.value)}
           onBlur={() => setTimeout(() => onSetProductSearch({ itemId: null, query: '' }), 200)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              if (suggestions && suggestions.length > 0) {
+                e.preventDefault();
+                onSelectProduct(item.id, suggestions[0]);
+              } else {
+                e.preventDefault();
+                const row = e.target.closest('.line-item-row');
+                const qtyInput = row?.querySelector('input[data-field="quantity"]');
+                if (qtyInput) {
+                  qtyInput.focus();
+                  qtyInput.select();
+                }
+              }
+            }
+          }}
           autoComplete="off" />
         {suggestions.length > 0 && (
-          <div className="product-suggestions">
-            {suggestions.map(p => (
-              <div key={p.id} className="product-suggestion-item"
-                onMouseDown={() => onSelectProduct(item.id, p)}>
-                <span className="product-suggestion-name">{p.name}</span>
-                <span className="product-suggestion-meta">
-                  {p.hsn && `HSN: ${p.hsn}`}{p.hsn && p.rate ? ' · ' : ''}{p.rate ? formatCurrency(p.rate, currency || 'INR') : ''}
-                </span>
-              </div>
-            ))}
+          <div className="product-suggestions" style={{ maxHeight: '280px', overflowY: 'auto', zIndex: 100, boxShadow: '0 10px 25px -5px rgba(0,0,0,0.15), 0 8px 10px -6px rgba(0,0,0,0.1)', border: '1px solid #cbd5e1', borderRadius: '8px' }}>
+            {suggestions.map(p => {
+              const stockVal = Number(p.stock) || 0;
+              const priceVal = p.sellingPrice ?? p.rate ?? 0;
+              return (
+                <div key={p.id} className="product-suggestion-item"
+                  onMouseDown={() => onSelectProduct(item.id, p)}
+                  style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.55rem 0.8rem', borderBottom: '1px solid #f1f5f9', cursor: 'pointer' }}>
+                  <div>
+                    <span className="product-suggestion-name" style={{ fontWeight: 600, color: '#0f172a' }}>{p.name}</span>
+                    <div className="product-suggestion-meta" style={{ fontSize: '0.74rem', color: '#64748b', marginTop: 2 }}>
+                      {p.hsn && <span style={{ marginRight: 8 }}>HSN: {p.hsn}</span>}
+                      <span style={{ fontWeight: 700, color: '#2563eb' }}>{formatCurrency(priceVal, currency || 'INR')}</span>
+                    </div>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <span style={{
+                      display: 'inline-block',
+                      fontSize: '0.72rem',
+                      fontWeight: 700,
+                      padding: '2px 8px',
+                      borderRadius: '9999px',
+                      background: stockVal > 0 ? '#ecfdf5' : '#fef2f2',
+                      color: stockVal > 0 ? '#059669' : '#dc2626',
+                      border: `1px solid ${stockVal > 0 ? '#a7f3d0' : '#fecaca'}`
+                    }}>
+                      Stock: {stockVal} {p.unit || 'Kg'}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
@@ -264,10 +303,26 @@ const LineItem = memo(function LineItem({
           })()}
         </div>
       )}
-      <div className="line-item-field" style={{ flex: 0.7 }}>
+      <div className="line-item-field" style={{ flex: 0.8 }}>
         <label className="form-label">Qty</label>
-        <input type="number" min="0" step="any" className="form-input" value={item.quantity}
-          onChange={(e) => onFieldChange(item.id, 'quantity', clampNonNeg(e.target.value))} />
+        <input type="number" min="0" step="any" className="form-input" data-field="quantity" value={item.quantity}
+          onChange={(e) => onFieldChange(item.id, 'quantity', clampNonNeg(e.target.value))}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              const row = e.target.closest('.line-item-row');
+              const rateInput = row?.querySelector('input[data-field="rate"]');
+              if (rateInput) {
+                rateInput.focus();
+                rateInput.select();
+              }
+            }
+          }} />
+        {item.stock !== undefined && (
+          <div style={{ fontSize: '0.68rem', color: (Number(item.stock) > 0 ? '#059669' : '#dc2626'), fontWeight: 600, marginTop: 2, whiteSpace: 'nowrap' }}>
+            Avail: {item.stock} {item.unit || ''}
+          </div>
+        )}
       </div>
       <div className="line-item-field" style={{ flex: 0.9 }}>
         <label className="form-label">Unit</label>
@@ -301,8 +356,16 @@ const LineItem = memo(function LineItem({
       </div>
       <div className="line-item-field" style={{ flex: 1.2 }}>
         <label className="form-label">Rate</label>
-        <input type="number" min="0" step="any" className="form-input" value={item.rate}
-          onChange={(e) => onFieldChange(item.id, 'rate', clampNonNeg(e.target.value))} />
+        <input type="number" min="0" step="any" className="form-input" data-field="rate" value={item.rate}
+          onChange={(e) => onFieldChange(item.id, 'rate', clampNonNeg(e.target.value))}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              if (isLastItem && onAddItem) {
+                onAddItem();
+              }
+            }
+          }} />
       </div>
       {invoiceOptions.showDiscount && (
         <div className="line-item-field" style={{ flex: 1.8, minWidth: 200 }}>
@@ -415,10 +478,11 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
   const [allProfiles, setAllProfiles] = useState([]);
   const [activeProfile, setActiveProfile] = useState(profileProp);
   const profile = activeProfile || profileProp;
-  const [invoiceType, setInvoiceType] = useState(editingBill?.invoiceType || draft?.invoiceType || 'tax-invoice');
+  const sanitizeType = (t) => (typeof t === 'string' && t.trim() ? t.trim() : 'tax-invoice');
+  const [invoiceType, setInvoiceType] = useState(() => sanitizeType(editingBill?.invoiceType || draft?.invoiceType));
   useEffect(() => {
     if (editingBill?.invoiceType) {
-      setInvoiceType(editingBill.invoiceType);
+      setInvoiceType(sanitizeType(editingBill.invoiceType));
     }
   }, [editingBill?.invoiceType]);
   // email/phone/isSEZ must be part of initial state — otherwise the SEZ flag
@@ -501,6 +565,16 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
   const [creditToApply, setCreditToApply] = useState(0);
   const [units, setUnits] = useState(getAllUnits());
   const [taxInclusive, setTaxInclusive] = useState(draft?.taxInclusive || false);
+
+  // Fast POS Billing State
+  const [posBarcodeScan, setPosBarcodeScan] = useState('');
+  const barcodeInputRef = useRef(null);
+  const [paymentMode, setPaymentMode] = useState(editingBill?.payments?.[0]?.method || 'Cash');
+  const [receivedAmount, setReceivedAmount] = useState(() => {
+    if (editingBill?.paidAmount !== undefined) return editingBill.paidAmount;
+    return '';
+  });
+  const [isFullPayment, setIsFullPayment] = useState(false);
 
   // v1.10.4 — totals is now a `useMemo` (was a `useState` fed by
   // `useEffect + setTotals` which forced a second full render on every
@@ -685,8 +759,13 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
 
   // Auto-save draft to sessionStorage
   useEffect(() => {
-    const draftData = { invoiceType, client, details, items, customTerms, customNotes, internalNote, extraSections, selectedTermsId, invoiceOptions, taxInclusive };
-    sessionStorage.setItem('gst_invoiceDraft', JSON.stringify(draftData));
+    try {
+      const safeType = typeof invoiceType === 'string' ? invoiceType : 'tax-invoice';
+      const draftData = { invoiceType: safeType, client, details, items, customTerms, customNotes, internalNote, extraSections, selectedTermsId, invoiceOptions, taxInclusive };
+      sessionStorage.setItem('gst_invoiceDraft', JSON.stringify(draftData));
+    } catch (err) {
+      console.warn('Draft auto-save failed:', err);
+    }
   }, [invoiceType, client, details, items, customTerms, customNotes, internalNote, extraSections, selectedTermsId, invoiceOptions, taxInclusive]);
 
   // Mark initialized after first render cycle so auto-save doesn't trigger on load
@@ -1104,18 +1183,31 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
       hsn: product.hsn || '',
       rate: salePrice,
       unit: product.unit || item.unit || 'Nos',
+      stock: product.stock,
       taxPercent: product.taxPercent ?? (countryTaxRates[countryTaxRates.length - 2] ?? 18),
       productId: product.id,
     } : item));
     setProductSearch({ itemId: null, query: '' });
+    // Fast POS jump to Qty field
+    requestAnimationFrame(() => {
+      const row = document.querySelector(`[data-item-id="${itemId}"]`);
+      const qtyInput = row?.querySelector('input[data-field="quantity"]');
+      if (qtyInput) {
+        qtyInput.focus();
+        qtyInput.select();
+      }
+    });
   }, [countryTaxRates]);
 
   const getProductSuggestions = useCallback((itemId) => {
     if (productSearch.itemId !== itemId || !productSearch.query.trim()) return [];
-    const q = productSearch.query.toLowerCase();
+    const q = productSearch.query.toLowerCase().trim();
     return products.filter(p =>
-      p.name?.toLowerCase().includes(q) || p.hsn?.toLowerCase().includes(q)
-    ).slice(0, 5);
+      p.name?.toLowerCase().includes(q) ||
+      p.hsn?.toLowerCase().includes(q) ||
+      (p.sku && p.sku.toLowerCase().includes(q)) ||
+      (p.barcode && p.barcode.toLowerCase().includes(q))
+    ).slice(0, 8);
   }, [productSearch.itemId, productSearch.query, products]);
 
   const addItem = () => {
@@ -1294,6 +1386,86 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
     return savedClients.filter(cli => cli.name.toLowerCase().includes(q));
   }, [client.name, savedClients]);
 
+  // Compute live party balance from all past invoices and payments
+  const getPartyBalance = useCallback((partyName, openingBal = 0) => {
+    if (!partyName) return 0;
+    const pBills = (allBillsForCredit || []).filter(b => (b.clientName || '').toLowerCase() === partyName.toLowerCase());
+    const total = pBills.reduce((s, b) => s + (Number(b.totalAmount) || 0), 0);
+    const paid = pBills.reduce((s, b) => {
+      const fromPayments = (b.payments || []).reduce((ps, p) => ps + (Number(p.amount) || 0), 0);
+      if (fromPayments > 0) return s + fromPayments;
+      if (typeof b.paidAmount === 'number' && b.paidAmount > 0) return s + b.paidAmount;
+      if (b.status === 'paid') return s + (Number(b.totalAmount) || 0);
+      return s;
+    }, 0);
+    return (Number(openingBal) || 0) + (total - paid);
+  }, [allBillsForCredit]);
+
+  // Barcode / SKU quick-scan handler for POS counter
+  const handlePosBarcodeEnter = (e) => {
+    if (e.key !== 'Enter') return;
+    const term = posBarcodeScan.trim();
+    if (!term) return;
+    e.preventDefault();
+
+    const q = term.toLowerCase();
+    const match = products.find(p =>
+      (p.barcode && p.barcode.toLowerCase() === q) ||
+      (p.sku && p.sku.toLowerCase() === q) ||
+      (p.hsn && p.hsn.toLowerCase() === q) ||
+      p.name?.toLowerCase() === q
+    ) || products.find(p => p.name?.toLowerCase().includes(q));
+
+    if (!match) {
+      toast(`No item found matching "${term}"`, 'warning');
+      return;
+    }
+
+    const salePrice = match.sellingPrice ?? match.rate ?? 0;
+    setItems(prev => {
+      const existingIdx = prev.findIndex(i => i.productId === match.id || (i.name && i.name.toLowerCase() === match.name.toLowerCase()));
+      if (existingIdx !== -1) {
+        const updated = [...prev];
+        updated[existingIdx] = {
+          ...updated[existingIdx],
+          quantity: (Number(updated[existingIdx].quantity) || 0) + 1,
+          stock: match.stock
+        };
+        return updated;
+      }
+
+      if (prev.length === 1 && !prev[0].name.trim()) {
+        return [{
+          ...prev[0],
+          name: match.name,
+          hsn: match.hsn || '',
+          quantity: 1,
+          unit: match.unit || 'Kg',
+          rate: salePrice,
+          stock: match.stock,
+          taxPercent: match.taxPercent ?? (countryTaxRates[countryTaxRates.length - 2] ?? 18),
+          productId: match.id,
+        }];
+      }
+
+      return [...prev, {
+        id: Date.now().toString(),
+        name: match.name,
+        hsn: match.hsn || '',
+        quantity: 1,
+        unit: match.unit || 'Kg',
+        rate: salePrice,
+        stock: match.stock,
+        taxPercent: match.taxPercent ?? (countryTaxRates[countryTaxRates.length - 2] ?? 18),
+        cessPercent: 0,
+        productId: match.id,
+      }];
+    });
+
+    toast(`⚡ Added ${match.name} (Stock: ${match.stock ?? 0})`, 'success');
+    setPosBarcodeScan('');
+  };
+
   // Close suggestions on click outside
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -1361,7 +1533,25 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
       ? planCreditApplication(client.name, allBillsForCredit, creditToApply, finalInvoiceNumber)
       : null;
 
+    const effectiveReceived = isFullPayment
+      ? (Number(totals.total) || 0)
+      : (receivedAmount !== '' ? Number(receivedAmount) || 0 : (editingBill?.paidAmount ?? (paymentMode === 'Credit' ? 0 : (Number(totals.total) || 0))));
     const seedPayments = editingBill?.payments ? [...editingBill.payments] : [];
+    if (effectiveReceived > 0 && seedPayments.length === 0) {
+      seedPayments.push({
+        id: Date.now().toString(),
+        date: details.invoiceDate || new Date().toISOString().split('T')[0],
+        amount: effectiveReceived,
+        method: paymentMode || 'Cash',
+        notes: 'Counter POS settlement'
+      });
+    } else if (seedPayments.length > 0 && effectiveReceived !== editingBill?.paidAmount) {
+      seedPayments[0] = {
+        ...seedPayments[0],
+        amount: effectiveReceived,
+        method: paymentMode || seedPayments[0].method || 'Cash'
+      };
+    }
     if (creditPlan?.targetEntry) seedPayments.push(creditPlan.targetEntry);
     const seedPaidAmount = seedPayments.reduce((s, p) => s + (Number(p.amount) || 0), 0);
     const seedStatus = editingBill?.status
@@ -1385,7 +1575,7 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
       // Preserve any pre-existing print history + carry through the patch
       printedCount: extraPatch.printedCount ?? editingBill?.printedCount ?? 0,
       lastPrintedAt: extraPatch.lastPrintedAt ?? editingBill?.lastPrintedAt ?? null,
-      data: { profile, client, details: { ...details, invoiceNumber: finalInvoiceNumber }, items, totals, invoiceType, customTerms, customNotes, internalNote, extraSections, invoiceOptions: invoiceOptionsWithSnapshot, taxInclusive }
+      data: { profile, client, details: { ...details, invoiceNumber: finalInvoiceNumber }, items, totals, invoiceType, customTerms, customNotes, internalNote, extraSections, invoiceOptions: invoiceOptionsWithSnapshot, taxInclusive, paymentMode, receivedAmount: effectiveReceived }
     };
     // Editing an existing bill → always overwrite. NEW bill on second-and-
     // later save this session → also overwrite (same invoice number, would
@@ -2152,7 +2342,11 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
       if (e.key === 's' || e.key === 'S') {
         if (!isMeaningfulInvoice()) return; // nothing to save
         e.preventDefault();
-        saveInvoiceToDB(true).then(() => toast('Invoice saved', 'success')).catch(() => toast('Save failed', 'error'));
+        if (e.shiftKey) {
+          handleSaveAndNew();
+        } else {
+          saveInvoiceToDB(true).then(() => toast('Invoice saved', 'success')).catch(() => toast('Save failed', 'error'));
+        }
       } else if (e.key === 'p' || e.key === 'P') {
         e.preventDefault();
         // Defer to the next tick so the keydown doesn't race the PDF render.
@@ -2392,6 +2586,67 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
     toast('E-Way Bill JSON downloaded', 'success');
   };
 
+  // Fast POS Save & New counter workflow
+  const handleSaveAndNew = async () => {
+    if (!isMeaningfulInvoice()) {
+      toast('Please enter a party name and at least one item before saving', 'warning');
+      return;
+    }
+    try {
+      setSaving(true);
+      await saveInvoiceToDB(false);
+      clearDraft();
+      toast('Invoice saved successfully! Ready for next customer.', 'success');
+
+      // Reset form fields
+      setClient({ name: '', address: '', city: '', pin: '', state: '', gstin: '', country: '', email: '', phone: '', isSEZ: false });
+      setSelectedClientId(null);
+      setReceivedAmount('');
+      setIsFullPayment(false);
+      setPaymentMode('Cash');
+      setItems([{
+        id: Date.now().toString(),
+        name: '',
+        hsn: '',
+        quantity: 1,
+        unit: getDefaultUnitForMode(invoiceOptions.invoiceMode),
+        rate: 0,
+        discount: 0,
+        taxPercent: showGST ? (countryTaxRates[countryTaxRates.length - 2] ?? 18) : 0,
+        cessPercent: 0
+      }]);
+      hasBeenSaved.current = false;
+      numberReserved.current = false;
+      stockDeducted.current = false;
+
+      // Increment sequence for next bill
+      const _psForPrefix = getPrintSettings();
+      const rawOverride = _psForPrefix.customPrefixes?.[invoiceType];
+      const overridePrefix = rawOverride && rawOverride.trim();
+      const prefix = overridePrefix || INVOICE_TYPES[invoiceType]?.prefix || 'INV';
+      const nextNum = await getNextInvoiceNumber(prefix, { peek: true, explicitPrefix: !!overridePrefix });
+      setDetails(prev => ({
+        ...prev,
+        invoiceNumber: nextNum,
+        invoiceDate: new Date().toISOString().split('T')[0],
+      }));
+
+      // Refresh products & bills in background
+      getAllProducts().then(setProducts).catch(() => {});
+      getAllBills().then(setAllBillsForCredit).catch(() => {});
+
+      // Instant focus to party input for the next customer
+      requestAnimationFrame(() => {
+        if (clientNameRef.current) clientNameRef.current.focus();
+      });
+    } catch (err) {
+      console.error('Save & New failed:', err);
+      toast('Failed to save invoice', 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <div className="generator-container">
       <div className="generator-toolbar">
@@ -2404,7 +2659,7 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
               <li><strong>Discount</strong> — per line: pick ₹ (fixed) or % of the line. Below the items: whole-bill discount, applied after tax.</li>
               <li><strong>Customize</strong> — toggle columns and sections on/off, pick paper size (A4 / A5 / 58mm / 80mm thermal), change the invoice title and PDF style.</li>
               <li><strong>Focus mode</strong> — the ▶/◀ button at the top hides the preview so the editor takes the full screen for heavy data entry.</li>
-              <li><strong>Keyboard</strong> — Ctrl+S save · Ctrl+P PDF · Ctrl+Enter add row · Ctrl+Shift+D duplicate last row · Esc close leave modal.</li>
+              <li><strong>Keyboard</strong> — Ctrl+S save · Ctrl+Shift+S Save &amp; New · Ctrl+P PDF · Ctrl+Enter add row · Ctrl+Shift+D duplicate last row · Esc close leave modal.</li>
               <li><strong>Auto-save</strong> — every 2s once the invoice is meaningful (client + at least one item). Back button is safe if you haven't touched anything.</li>
             </ul>
           </HelpButton>
@@ -2417,7 +2672,50 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
             {autoSaveStatus === 'idle' && !isMeaningfulInvoice() && <span title="Add a client name and at least one item to start saving">Draft only — not saved yet</span>}
           </span>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-center">
+          {/* Quick Paper Preset Switcher */}
+          <div style={{ display: 'flex', alignItems: 'center', background: 'var(--bg-secondary)', padding: '2px 4px', borderRadius: '8px', border: '1px solid var(--border)' }}>
+            <button
+              type="button"
+              onClick={() => setInvoiceOptions(prev => ({ ...prev, paperSize: 'a4' }))}
+              style={{
+                padding: '0.28rem 0.65rem',
+                borderRadius: '6px',
+                fontSize: '0.78rem',
+                fontWeight: invoiceOptions.paperSize === 'a4' ? 700 : 500,
+                background: invoiceOptions.paperSize === 'a4' ? 'var(--primary)' : 'transparent',
+                color: invoiceOptions.paperSize === 'a4' ? '#ffffff' : 'var(--text-muted)',
+                border: 'none',
+                cursor: 'pointer'
+              }}
+              title="A4 Full Page GST Tax Invoice"
+            >
+              📄 A4
+            </button>
+            <button
+              type="button"
+              onClick={() => setInvoiceOptions(prev => ({ ...prev, paperSize: 'thermal-80mm' }))}
+              style={{
+                padding: '0.28rem 0.65rem',
+                borderRadius: '6px',
+                fontSize: '0.78rem',
+                fontWeight: invoiceOptions.paperSize === 'thermal-80mm' ? 700 : 500,
+                background: invoiceOptions.paperSize === 'thermal-80mm' ? 'var(--primary)' : 'transparent',
+                color: invoiceOptions.paperSize === 'thermal-80mm' ? '#ffffff' : 'var(--text-muted)',
+                border: 'none',
+                cursor: 'pointer'
+              }}
+              title="80mm (3-inch) POS Counter Thermal Slip"
+            >
+              🧾 80mm Slip
+            </button>
+          </div>
+
+          <button className="btn btn-secondary" onClick={handleSaveAndNew} disabled={saving}
+            style={{ background: '#ecfdf5', color: '#059669', borderColor: '#a7f3d0', fontWeight: 700 }}
+            title="Save and open fresh invoice for next customer (Ctrl+Shift+S)">
+            <Plus size={18} /> Save &amp; New
+          </button>
           <button className="btn btn-secondary" onClick={() => setShowPreviewModal(true)} title="Preview full invoice before printing/downloading">
             <Eye size={18} /> Preview
           </button>
@@ -3057,7 +3355,33 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
 
             <div className="grid grid-cols-2 gap-4">
               <div className="form-group full-width" style={{ position: 'relative' }}>
-                <label className="form-label">Client Name</label>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
+                  <label className="form-label" style={{ margin: 0 }}>Client / Party Name</label>
+                  {client.name && (() => {
+                    const bal = getPartyBalance(client.name, client.openingBalance);
+                    const hasDue = bal > 0.01;
+                    const hasAdvance = bal < -0.01;
+                    return (
+                      <div style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '2px 10px',
+                        borderRadius: '9999px',
+                        fontSize: '0.75rem',
+                        fontWeight: 700,
+                        background: hasDue ? '#fef2f2' : (hasAdvance ? '#ecfdf5' : '#f8fafc'),
+                        color: hasDue ? '#dc2626' : (hasAdvance ? '#059669' : '#64748b'),
+                        border: `1px solid ${hasDue ? '#fecaca' : (hasAdvance ? '#a7f3d0' : '#e2e8f0')}`,
+                      }}>
+                        <span>Current Balance:</span>
+                        <span style={{ fontSize: '0.82rem' }}>
+                          {formatCurrency(Math.abs(bal), invoiceOptions.currency || 'INR')} {hasDue ? '(Due)' : (hasAdvance ? '(Advance)' : '')}
+                        </span>
+                      </div>
+                    );
+                  })()}
+                </div>
                 <div style={{ display: 'flex', gap: '0.4rem' }}>
                   <input type="text" className="form-input" style={{ flex: 1 }} value={client.name} ref={clientNameRef}
                     onChange={(e) => {
@@ -3108,20 +3432,33 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
                     </div>
 
                     {/* Customer Rows */}
-                    {filteredClients.length > 0 ? filteredClients.map(cli => (
-                      <div key={cli.id} className="client-suggestion-row" style={{ padding: '0.55rem 1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #f8fafc' }}>
-                        <button type="button" className="client-suggestion-item" onClick={() => selectSavedClient(cli)} style={{ flex: 1, textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer' }}>
-                          <div className="client-suggestion-main">
-                            <strong style={{ fontSize: '0.9rem', color: '#0f172a', display: 'block' }}>{cli.name}</strong>
-                            <span style={{ fontSize: '0.78rem', color: '#64748b' }}>{cli.phone || cli.gstin || 'No contact details'}</span>
+                    {filteredClients.length > 0 ? filteredClients.map(cli => {
+                      const partyBal = getPartyBalance(cli.name, cli.openingBalance);
+                      const isDue = partyBal > 0.01;
+                      const isAdv = partyBal < -0.01;
+                      return (
+                        <div key={cli.id} className="client-suggestion-row" style={{ padding: '0.55rem 1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #f8fafc' }}>
+                          <button type="button" className="client-suggestion-item" onClick={() => selectSavedClient(cli)} style={{ flex: 1, textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer' }}>
+                            <div className="client-suggestion-main">
+                              <strong style={{ fontSize: '0.9rem', color: '#0f172a', display: 'block' }}>{cli.name}</strong>
+                              <span style={{ fontSize: '0.78rem', color: '#64748b' }}>{cli.phone || cli.gstin || 'No contact details'}</span>
+                            </div>
+                          </button>
+                          <div style={{ textAlign: 'right', fontWeight: 700, fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span style={{ color: isDue ? '#dc2626' : (isAdv ? '#059669' : '#64748b') }}>
+                              {formatCurrency(Math.abs(partyBal), invoiceOptions.currency || 'INR')} {isDue ? 'Dr' : (isAdv ? 'Cr' : '')}
+                            </span>
+                            <span style={{
+                              background: isDue ? '#fee2e2' : (isAdv ? '#d1fae5' : '#e2e8f0'),
+                              color: isDue ? '#dc2626' : (isAdv ? '#059669' : '#64748b'),
+                              fontSize: '0.68rem', padding: '2px 5px', borderRadius: '4px', fontWeight: 800
+                            }}>
+                              {isDue ? '↗ Due' : (isAdv ? '↙ Adv' : '✓ 0')}
+                            </span>
                           </div>
-                        </button>
-                        <div style={{ textAlign: 'right', fontWeight: 700, color: '#059669', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          <span>{cli.openingBalance || 0}</span>
-                          <span style={{ background: '#10b981', color: '#fff', fontSize: '0.65rem', padding: '2px 4px', borderRadius: '4px', fontWeight: 800 }}>↙</span>
                         </div>
-                      </div>
-                    )) : (
+                      );
+                    }) : (
                       <div style={{ padding: '1rem', textAlign: 'center', color: '#64748b', fontSize: '0.85rem' }}>
                         No party found. Click <strong>Add Party</strong> above to create one.
                       </div>
@@ -3299,7 +3636,37 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
                 </label>
               )}
             </div>
-            {items.map((item) => (
+
+            {/* Quick POS Barcode / SKU Scanner Bar */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.75rem',
+              background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
+              border: '1px solid #86efac',
+              padding: '0.5rem 0.85rem',
+              borderRadius: '8px',
+              marginBottom: '1rem'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#166534', fontWeight: 700, fontSize: '0.82rem', whiteSpace: 'nowrap' }}>
+                <ScanBarcode size={18} /> Quick POS Scan / Add:
+              </div>
+              <input
+                ref={barcodeInputRef}
+                type="text"
+                className="form-input"
+                style={{ background: '#ffffff', borderColor: '#86efac', flex: 1, fontSize: '0.85rem' }}
+                placeholder="Scan barcode or type exact product name/code & press Enter..."
+                value={posBarcodeScan}
+                onChange={e => setPosBarcodeScan(e.target.value)}
+                onKeyDown={handlePosBarcodeEnter}
+              />
+              <span style={{ fontSize: '0.72rem', color: '#15803d', fontWeight: 500, whiteSpace: 'nowrap' }}>
+                ⚡ Auto-increments Qty on scan
+              </span>
+            </div>
+
+            {items.map((item, idx) => (
               <LineItem
                 key={item.id}
                 item={item}
@@ -3321,6 +3688,8 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
                 onRemoveCustomUnit={handleRemoveCustomUnit}
                 onRemove={removeItem}
                 clampNonNeg={clampNonNeg}
+                isLastItem={idx === items.length - 1}
+                onAddItem={addItem}
               />
             ))}
             <button className="btn btn-secondary mt-2" onClick={addItem}><Plus size={18} /> Add Item</button>
@@ -3344,6 +3713,207 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
               <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
                 Applied after tax. For GST-compliant pre-tax discount, use per-line discount instead.
               </span>
+            </div>
+          </div>
+
+          {/* Vyapar Fast POS Payment & Settlement Card */}
+          <div className="glass-panel p-6 mb-6" style={{ border: '1px solid #cbd5e1', background: 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.6rem' }}>
+              <h3 className="section-title" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <IndianRupee size={18} color="#2563eb" /> Payment &amp; Settlement
+              </h3>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <span style={{ fontSize: '0.85rem', color: '#64748b' }}>Total Bill:</span>
+                <span style={{ fontSize: '1.3rem', fontWeight: 800, color: '#0f172a' }}>
+                  {formatCurrency(Number(totals.total) || 0, invoiceOptions.currency || 'INR')}
+                </span>
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', alignItems: 'flex-start' }}>
+              {/* Payment Mode Buttons */}
+              <div>
+                <label className="form-label" style={{ fontWeight: 600, marginBottom: '0.4rem' }}>Payment Mode</label>
+                <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                  {[
+                    { id: 'Cash', label: '💵 Cash' },
+                    { id: 'UPI', label: '📱 UPI / QR' },
+                    { id: 'Bank Transfer', label: '🏦 Bank' },
+                    { id: 'Cheque', label: '📜 Cheque' },
+                    { id: 'Credit', label: '⏳ Credit / Unpaid' },
+                  ].map(pm => {
+                    const isSelected = paymentMode === pm.id;
+                    return (
+                      <button
+                        key={pm.id}
+                        type="button"
+                        onClick={() => {
+                          setPaymentMode(pm.id);
+                          if (pm.id === 'Credit') {
+                            setReceivedAmount(0);
+                            setIsFullPayment(false);
+                          } else if (!receivedAmount || receivedAmount === 0) {
+                            setReceivedAmount(Number(totals.total) || 0);
+                            setIsFullPayment(true);
+                          }
+                        }}
+                        style={{
+                          padding: '0.4rem 0.75rem',
+                          borderRadius: '6px',
+                          fontSize: '0.82rem',
+                          fontWeight: isSelected ? 700 : 500,
+                          cursor: 'pointer',
+                          border: isSelected ? '2px solid #2563eb' : '1px solid #cbd5e1',
+                          background: isSelected ? '#eff6ff' : '#ffffff',
+                          color: isSelected ? '#1d4ed8' : '#334155',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        {pm.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Amount Received Input & Quick Toggles */}
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+                  <label className="form-label" style={{ margin: 0, fontWeight: 600 }}>Amount Received</label>
+                  <div style={{ display: 'flex', gap: '4px' }}>
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      style={{ fontSize: '0.7rem', padding: '0.15rem 0.45rem', height: 'auto', background: '#ecfdf5', color: '#059669', borderColor: '#a7f3d0' }}
+                      onClick={() => {
+                        setReceivedAmount(Number(totals.total) || 0);
+                        setIsFullPayment(true);
+                        if (paymentMode === 'Credit') setPaymentMode('Cash');
+                      }}
+                    >
+                      Full Paid
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      style={{ fontSize: '0.7rem', padding: '0.15rem 0.45rem', height: 'auto', background: '#fef2f2', color: '#dc2626', borderColor: '#fecaca' }}
+                      onClick={() => {
+                        setReceivedAmount(0);
+                        setIsFullPayment(false);
+                        setPaymentMode('Credit');
+                      }}
+                    >
+                      Zero / Credit
+                    </button>
+                  </div>
+                </div>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type="number"
+                    min="0"
+                    step="any"
+                    className="form-input"
+                    style={{ fontSize: '1.05rem', fontWeight: 700, paddingLeft: '2rem' }}
+                    placeholder="0.00"
+                    value={receivedAmount}
+                    onChange={e => {
+                      setReceivedAmount(e.target.value === '' ? '' : clampNonNeg(e.target.value));
+                      setIsFullPayment(false);
+                    }}
+                  />
+                  <span style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', fontWeight: 700, color: '#64748b' }}>₹</span>
+                </div>
+              </div>
+
+              {/* Balance / Change Calculation Display */}
+              <div style={{
+                background: '#f8fafc',
+                border: '1px solid #e2e8f0',
+                borderRadius: '8px',
+                padding: '0.75rem 1rem',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'center'
+              }}>
+                {(() => {
+                  const total = Number(totals.total) || 0;
+                  const rec = receivedAmount === '' ? (paymentMode === 'Credit' ? 0 : total) : Number(receivedAmount) || 0;
+                  const diff = total - rec;
+                  if (diff > 0.01) {
+                    return (
+                      <div>
+                        <div style={{ fontSize: '0.75rem', color: '#dc2626', fontWeight: 600 }}>Balance Due (Receivable)</div>
+                        <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#dc2626' }}>
+                          {formatCurrency(diff, invoiceOptions.currency || 'INR')}
+                        </div>
+                        <div style={{ fontSize: '0.7rem', color: '#64748b' }}>Added to party's outstanding dues</div>
+                      </div>
+                    );
+                  } else if (diff < -0.01) {
+                    return (
+                      <div>
+                        <div style={{ fontSize: '0.75rem', color: '#059669', fontWeight: 600 }}>Change to Return to Customer</div>
+                        <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#059669' }}>
+                          {formatCurrency(Math.abs(diff), invoiceOptions.currency || 'INR')}
+                        </div>
+                        <div style={{ fontSize: '0.7rem', color: '#64748b' }}>Customer paid extra cash</div>
+                      </div>
+                    );
+                  } else {
+                    return (
+                      <div>
+                        <div style={{ fontSize: '0.75rem', color: '#059669', fontWeight: 600 }}>Bill Fully Paid</div>
+                        <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#059669' }}>
+                          {formatCurrency(0, invoiceOptions.currency || 'INR')} Due
+                        </div>
+                        <div style={{ fontSize: '0.7rem', color: '#64748b' }}>No pending amount on this invoice</div>
+                      </div>
+                    );
+                  }
+                })()}
+              </div>
+            </div>
+
+            {/* Quick POS Save Buttons in Settlement Card */}
+            <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px solid #e2e8f0', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={handleSaveAndNew}
+                disabled={saving}
+                style={{ background: '#ecfdf5', color: '#059669', borderColor: '#a7f3d0', fontWeight: 700, padding: '0.55rem 1.1rem' }}
+                title="Save current invoice and immediately open a fresh blank invoice (Ctrl+Shift+S)"
+              >
+                <Plus size={17} /> Save &amp; New
+              </button>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={async () => {
+                  await saveInvoiceToDB(false);
+                  toast('Invoice saved! Opening thermal slip…', 'success');
+                  setShowThermalPreview(true);
+                }}
+                disabled={saving}
+                style={{ fontWeight: 600, padding: '0.55rem 1.1rem' }}
+                title="Save and open 80mm / 3-inch thermal slip"
+              >
+                <Printer size={17} /> Save &amp; Print Slip (Thermal)
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={async () => {
+                  await saveInvoiceToDB(false);
+                  toast('Invoice saved!', 'success');
+                  directPrint();
+                }}
+                disabled={saving}
+                style={{ fontWeight: 700, padding: '0.55rem 1.25rem' }}
+                title="Save invoice and trigger browser print (A4 / standard)"
+              >
+                <Check size={18} /> Save &amp; Print (A4)
+              </button>
             </div>
           </div>
 

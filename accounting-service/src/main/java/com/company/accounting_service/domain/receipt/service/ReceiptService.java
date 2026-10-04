@@ -10,6 +10,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import com.company.accounting_service.core.tenant.TenantContext;
+
 @Service
 @RequiredArgsConstructor
 public class ReceiptService {
@@ -18,7 +20,7 @@ public class ReceiptService {
 
     @Transactional(readOnly = true)
     public List<ReceiptDTO> getAllReceipts() {
-        return receiptRepository.findAll().stream()
+        return receiptRepository.findByTenant(TenantContext.getCurrentTenant()).stream()
                 .map(this::mapToDTO)
                 .collect(Collectors.toList());
     }
@@ -27,10 +29,11 @@ public class ReceiptService {
     public ReceiptDTO saveReceipt(ReceiptDTO dto) {
         Receipt receipt;
         if (dto.getId() != null) {
-            receipt = receiptRepository.findById(dto.getId())
+            receipt = receiptRepository.findByIdAndTenant(dto.getId(), TenantContext.getCurrentTenant())
                     .orElseThrow(() -> new RuntimeException("Receipt not found"));
         } else {
             receipt = new Receipt();
+            receipt.setTenantId(TenantContext.getCurrentTenant());
         }
 
         receipt.setDate(dto.getDate());
@@ -42,6 +45,7 @@ public class ReceiptService {
         receipt.setReferenceNo(dto.getReferenceNo());
         receipt.setAgainstInvoice(dto.getAgainstInvoice());
         receipt.setNote(dto.getNote());
+        receipt.setExtraJson(com.company.accounting_service.core.json.ExtraJson.write(dto.extraFields()));
 
         receipt = receiptRepository.save(receipt);
         return mapToDTO(receipt);
@@ -49,7 +53,9 @@ public class ReceiptService {
 
     @Transactional
     public void deleteReceipt(Long id) {
-        receiptRepository.deleteById(id);
+        Receipt receipt = receiptRepository.findByIdAndTenant(id, TenantContext.getCurrentTenant())
+                .orElseThrow(() -> new RuntimeException("Receipt not found"));
+        receiptRepository.delete(receipt);
     }
 
     private ReceiptDTO mapToDTO(Receipt receipt) {
@@ -64,6 +70,7 @@ public class ReceiptService {
         dto.setReferenceNo(receipt.getReferenceNo());
         dto.setAgainstInvoice(receipt.getAgainstInvoice());
         dto.setNote(receipt.getNote());
+        dto.extraFields().putAll(com.company.accounting_service.core.json.ExtraJson.read(receipt.getExtraJson()));
         return dto;
     }
 }

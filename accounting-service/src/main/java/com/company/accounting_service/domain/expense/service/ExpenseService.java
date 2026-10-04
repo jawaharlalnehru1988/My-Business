@@ -10,6 +10,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import com.company.accounting_service.core.tenant.TenantContext;
+
 @Service
 @RequiredArgsConstructor
 public class ExpenseService {
@@ -18,7 +20,7 @@ public class ExpenseService {
 
     @Transactional(readOnly = true)
     public List<ExpenseDTO> getAllExpenses() {
-        return expenseRepository.findAll().stream()
+        return expenseRepository.findByTenant(TenantContext.getCurrentTenant()).stream()
                 .map(this::mapToDTO)
                 .collect(Collectors.toList());
     }
@@ -27,10 +29,11 @@ public class ExpenseService {
     public ExpenseDTO saveExpense(ExpenseDTO dto) {
         Expense expense;
         if (dto.getId() != null) {
-            expense = expenseRepository.findById(dto.getId())
+            expense = expenseRepository.findByIdAndTenant(dto.getId(), TenantContext.getCurrentTenant())
                     .orElseThrow(() -> new RuntimeException("Expense not found"));
         } else {
             expense = new Expense();
+            expense.setTenantId(TenantContext.getCurrentTenant());
         }
 
         expense.setDate(dto.getDate());
@@ -45,6 +48,7 @@ public class ExpenseService {
         expense.setInvoiceNo(dto.getInvoiceNo());
         expense.setPaymentMode(dto.getPaymentMode());
         expense.setNote(dto.getNote());
+        expense.setExtraJson(com.company.accounting_service.core.json.ExtraJson.write(dto.extraFields()));
 
         expense = expenseRepository.save(expense);
         return mapToDTO(expense);
@@ -52,7 +56,9 @@ public class ExpenseService {
 
     @Transactional
     public void deleteExpense(Long id) {
-        expenseRepository.deleteById(id);
+        Expense expense = expenseRepository.findByIdAndTenant(id, TenantContext.getCurrentTenant())
+                .orElseThrow(() -> new RuntimeException("Expense not found"));
+        expenseRepository.delete(expense);
     }
 
     private ExpenseDTO mapToDTO(Expense expense) {
@@ -70,6 +76,7 @@ public class ExpenseService {
         dto.setInvoiceNo(expense.getInvoiceNo());
         dto.setPaymentMode(expense.getPaymentMode());
         dto.setNote(expense.getNote());
+        dto.extraFields().putAll(com.company.accounting_service.core.json.ExtraJson.read(expense.getExtraJson()));
         return dto;
     }
 }

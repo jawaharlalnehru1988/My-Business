@@ -10,6 +10,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import com.company.accounting_service.core.tenant.TenantContext;
+
 @Service
 @RequiredArgsConstructor
 public class SupplierService {
@@ -18,7 +20,7 @@ public class SupplierService {
 
     @Transactional(readOnly = true)
     public List<SupplierDTO> getAllSuppliers() {
-        return supplierRepository.findAll().stream()
+        return supplierRepository.findByTenant(TenantContext.getCurrentTenant()).stream()
                 .map(this::mapToDTO)
                 .collect(Collectors.toList());
     }
@@ -27,10 +29,15 @@ public class SupplierService {
     public SupplierDTO saveSupplier(SupplierDTO dto) {
         Supplier supplier;
         if (dto.getId() != null) {
-            supplier = supplierRepository.findById(dto.getId())
-                    .orElseGet(Supplier::new);
+            supplier = supplierRepository.findByIdAndTenant(dto.getId(), TenantContext.getCurrentTenant())
+                    .orElseGet(() -> {
+                        Supplier s = new Supplier();
+                        s.setTenantId(TenantContext.getCurrentTenant());
+                        return s;
+                    });
         } else {
             supplier = new Supplier();
+            supplier.setTenantId(TenantContext.getCurrentTenant());
         }
 
         supplier.setName(dto.getName());
@@ -46,6 +53,7 @@ public class SupplierService {
         supplier.setBankName(dto.getBankName());
         supplier.setAccountNumber(dto.getAccountNumber());
         supplier.setIfscCode(dto.getIfscCode());
+        supplier.setExtraJson(com.company.accounting_service.core.json.ExtraJson.write(dto.extraFields()));
 
         supplier = supplierRepository.save(supplier);
         return mapToDTO(supplier);
@@ -53,7 +61,9 @@ public class SupplierService {
 
     @Transactional
     public void deleteSupplier(Long id) {
-        supplierRepository.deleteById(id);
+        Supplier supplier = supplierRepository.findByIdAndTenant(id, TenantContext.getCurrentTenant())
+                .orElseThrow(() -> new RuntimeException("Supplier not found"));
+        supplierRepository.delete(supplier);
     }
 
     private SupplierDTO mapToDTO(Supplier supplier) {
@@ -72,6 +82,7 @@ public class SupplierService {
         dto.setBankName(supplier.getBankName());
         dto.setAccountNumber(supplier.getAccountNumber());
         dto.setIfscCode(supplier.getIfscCode());
+        dto.extraFields().putAll(com.company.accounting_service.core.json.ExtraJson.read(supplier.getExtraJson()));
         return dto;
     }
 }

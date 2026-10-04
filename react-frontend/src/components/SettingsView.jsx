@@ -7,6 +7,7 @@ import { initGoogleDrive, isConnected, disconnect } from '../services/googleDriv
 import { toast } from './Toast';
 import { confirmAction } from './ConfirmModal';
 import PrintSettings from './PrintSettings';
+import BackupRestoreHub from './BackupRestoreHub';
 import HelpButton from './HelpButton';
 import { getBackupsList, restoreBackup, triggerBackup, deleteBackup, getTrashedBills, restoreTrashedBill, purgeTrashedBill } from '../store';
 
@@ -587,8 +588,8 @@ export default function SettingsView({ onSaved }) {
       {/* ---- Thermal Printer Settings ---- */}
       <PrintSettings />
 
-      {/* v1.9.5 — Backup Management + Trash Bin */}
-      <BackupAndTrashPanel />
+      {/* Automated Database Backup & Cloud Sync Hub */}
+      <BackupRestoreHub />
 
       {/* ---- Modules / Features ---- */}
       <div className="glass-panel p-6 mb-6">

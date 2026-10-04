@@ -16,6 +16,10 @@ public class AccountingInventoryEventProducer {
 
     public void publishEvent(InventoryEvent event) {
         log.info("Publishing event to topic {}: {}", TOPIC, event);
-        kafkaTemplate.send(TOPIC, event.getTransactionId(), event);
+        try {
+            kafkaTemplate.send(TOPIC, event.getTransactionId(), event);
+        } catch (Exception e) {
+            log.warn("Kafka broker unavailable, skipping async event publish for transaction: {}", event.getTransactionId(), e);
+        }
     }
 }

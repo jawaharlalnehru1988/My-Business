@@ -1,9 +1,28 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { FileText, Download, Upload, ExternalLink, CheckCircle, ChevronDown, ChevronRight, AlertTriangle, BookOpen, BarChart3 } from 'lucide-react';
+import {
+  FileText, Download, Upload, ExternalLink, CheckCircle, ChevronDown,
+  ChevronRight, AlertTriangle, BookOpen, BarChart3, TrendingUp, Wallet,
+  Percent, ShieldCheck, CheckCircle2, Zap, Layers, RefreshCw
+} from 'lucide-react';
 import { getAllBills, getAllExpenses, getAllPurchases, getProfile } from '../store';
-import { formatCurrency, INVOICE_TYPES, calculateLineItemTax, getStateCode, formatDateGST, getFilingPeriod, getUnitUQC, getFYOptions } from '../utils';
+import { formatCurrency, INVOICE_TYPES, calculateLineItemTax, getStateCode, formatDateGST, getFilingPeriod, getUnitUQC, getFYOptions, getCountryConfig } from '../utils';
+import { getPrintSettings } from '../utils/printSettings';
 import { toast } from './Toast';
 import HelpButton from './HelpButton';
+
+// Accent helper for PDF exports
+function getAccentRGB() {
+  try {
+    const ps = getPrintSettings();
+    if (ps.userColorsEnabled && ps.pdfAccent) {
+      const hex = String(ps.pdfAccent).replace('#', '');
+      if (/^[0-9a-f]{6}$/i.test(hex)) {
+        return [parseInt(hex.slice(0, 2), 16), parseInt(hex.slice(2, 4), 16), parseInt(hex.slice(4, 6), 16)];
+      }
+    }
+  } catch { /* default */ }
+  return [30, 64, 175];
+}
 
 const GST_TYPES = ['tax-invoice', 'credit-note'];
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -1204,8 +1223,130 @@ export default function GSTReturns() {
     }
   };
 
+  const itcTotal = (itcFromExpenses.cgst || 0) + (itcFromExpenses.sgst || 0) + (itcFromExpenses.igst || 0);
+
+  // 1-Click Export GST Filing Summary PDF (for CA & Tax Consultant)
+  const exportFilingSummaryPDF = async () => {
+    try {
+      const { jsPDF } = await import('jspdf');
+      const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+      const marginL = 15, marginR = 195, tableW = marginR - marginL;
+
+      const fmt = (n) => 'Rs. ' + (Number(n) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+      let y = 18;
+      doc.setFontSize(16); doc.setFont('helvetica', 'bold');
+      doc.text('GST TAX FILING & RECONCILIATION SUMMARY', marginL, y); y += 6;
+      doc.setFontSize(9); doc.setFont('helvetica', 'normal'); doc.setTextColor(100);
+      doc.text(profile?.businessName || 'Business Enterprise', marginL, y); y += 4.5;
+      if (profile?.gstin) { doc.text(`GSTIN: ${profile.gstin} | State: ${profile.state || 'India'}`, marginL, y); y += 4.5; }
+      doc.setTextColor(0);
+
+      // Period & Dates
+      const periodLabel = filterMode === 'month'
+        ? `${MONTHS[parseInt(monthFilter)]} ${yearFilter}`
+        : (filterMode === 'quarter' ? `${QUARTERS.find(q => q.id === quarterFilter)?.label} ${yearFilter}` : (fyOptions.find(f => f.value === fyFilter)?.label || 'FY'));
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(10);
+      doc.text(`Filing Period: ${periodLabel}`, marginR, 20, { align: 'right' });
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5);
+      doc.text(`Generated: ${new Date().toLocaleDateString('en-IN')}`, marginR, 26, { align: 'right' });
+
+      y += 6;
+      doc.setDrawColor(...getAccentRGB()); doc.setLineWidth(0.6);
+      doc.line(marginL, y, marginR, y); y += 6;
+
+      // Executive Summary Card
+      doc.setFillColor(245, 247, 250);
+      doc.rect(marginL, y, tableW, 14, 'F');
+      doc.setFontSize(8.5); doc.setFont('helvetica', 'bold');
+      doc.text(`Taxable Turnover: ${fmt(grandTotals.taxable)}`, marginL + 4, y + 6);
+      doc.text(`Total Output GST: ${fmt(totalTax)}`, marginL + 68, y + 6);
+      doc.text(`Total ITC Available: ${fmt(itcTotal)}`, marginL + 125, y + 6);
+
+      doc.text(`Total Invoices: ${filteredBills.length}`, marginL + 4, y + 11);
+      doc.setTextColor(netPayable > 0 ? 220 : 5, netPayable > 0 ? 38 : 150, netPayable > 0 ? 38 : 105);
+      doc.text(`Net Cash Payable: ${fmt(Math.max(0, netPayable))}`, marginL + 125, y + 11);
+      doc.setTextColor(0);
+      y += 20;
+
+      // Table 1: GSTR-1 Outward Supplies Breakdown
+      doc.setFillColor(...getAccentRGB());
+      doc.rect(marginL, y, tableW, 8, 'F');
+      doc.setTextColor(255); doc.setFontSize(8.5); doc.setFont('helvetica', 'bold');
+      doc.text('GSTR-1 Outward Supplies (Sales)', marginL + 4, y + 5.5);
+      doc.text('Taxable (Rs.)', marginL + 80, y + 5.5, { align: 'right' });
+      doc.text('CGST', marginL + 110, y + 5.5, { align: 'right' });
+      doc.text('SGST', marginL + 138, y + 5.5, { align: 'right' });
+      doc.text('IGST', marginL + 165, y + 5.5, { align: 'right' });
+      doc.text('Total (Rs.)', marginR - 3, y + 5.5, { align: 'right' });
+      doc.setTextColor(0);
+      y += 11;
+
+      const r1Rows = [
+        { label: `Table 4A - B2B Sales (${b2bRows.length} bills)`, tx: b2bTotals.taxable, c: b2bTotals.cgst, s: b2bTotals.sgst, i: b2bTotals.igst, tot: b2bTotals.total },
+        { label: `Table 7 - B2C Sales (${b2cBills.length} bills)`, tx: b2cTotals.taxable, c: b2cTotals.cgst, s: b2cTotals.sgst, i: b2cTotals.igst, tot: b2cTotals.total },
+        { label: `Table 9B - Credit Notes (${creditNotes.length} notes)`, tx: -cnTotals.taxable, c: -cnTotals.cgst, s: -cnTotals.sgst, i: -cnTotals.igst, tot: -cnTotals.total, red: true },
+        { label: 'Net Outward Supplies Total', tx: grandTotals.taxable, c: grandTotals.cgst, s: grandTotals.sgst, i: grandTotals.igst, tot: grandTotals.total, bold: true }
+      ];
+
+      doc.setFontSize(8);
+      r1Rows.forEach(r => {
+        doc.setFont('helvetica', r.bold ? 'bold' : 'normal');
+        if (r.red) doc.setTextColor(220, 38, 38);
+        doc.text(r.label, marginL + 4, y);
+        doc.text(fmt(r.tx), marginL + 80, y, { align: 'right' });
+        doc.text(fmt(r.c), marginL + 110, y, { align: 'right' });
+        doc.text(fmt(r.s), marginL + 138, y, { align: 'right' });
+        doc.text(fmt(r.i), marginL + 165, y, { align: 'right' });
+        doc.text(fmt(r.tot), marginR - 3, y, { align: 'right' });
+        doc.setTextColor(0);
+        y += 6;
+      });
+
+      y += 6;
+
+      // Table 2: GSTR-3B Tax Offset & Cash Payment
+      doc.setFillColor(...getAccentRGB());
+      doc.rect(marginL, y, tableW, 8, 'F');
+      doc.setTextColor(255); doc.setFontSize(8.5); doc.setFont('helvetica', 'bold');
+      doc.text('GSTR-3B Tax Liability vs. Input Tax Credit (ITC)', marginL + 4, y + 5.5);
+      doc.text('CGST (Rs.)', marginL + 110, y + 5.5, { align: 'right' });
+      doc.text('SGST (Rs.)', marginL + 138, y + 5.5, { align: 'right' });
+      doc.text('IGST (Rs.)', marginL + 165, y + 5.5, { align: 'right' });
+      doc.text('Total (Rs.)', marginR - 3, y + 5.5, { align: 'right' });
+      doc.setTextColor(0);
+      y += 11;
+
+      const r3bRows = [
+        { label: '1. Total Output Tax Liability', c: outputTax.cgst, s: outputTax.sgst, i: outputTax.igst, tot: totalTax, bold: true },
+        { label: '2. Less: Eligible ITC from Purchases & Expenses', c: itcFromExpenses.cgst, s: itcFromExpenses.sgst, i: itcFromExpenses.igst, tot: itcTotal, green: true },
+        { label: '3. NET TAX PAYABLE IN CASH', c: netTax.cgst, s: netTax.sgst, i: netTax.igst, tot: Math.max(0, netPayable), bold: true, big: true, red: netPayable > 0, green: netPayable <= 0 }
+      ];
+
+      r3bRows.forEach(r => {
+        doc.setFont('helvetica', r.bold ? 'bold' : 'normal');
+        if (r.green) doc.setTextColor(5, 150, 105);
+        else if (r.red) doc.setTextColor(220, 38, 38);
+        doc.setFontSize(r.big ? 9.5 : 8);
+
+        doc.text(r.label, marginL + 4, y);
+        doc.text(fmt(r.c), marginL + 110, y, { align: 'right' });
+        doc.text(fmt(r.s), marginL + 138, y, { align: 'right' });
+        doc.text(fmt(r.i), marginL + 165, y, { align: 'right' });
+        doc.text(fmt(r.tot), marginR - 3, y, { align: 'right' });
+        doc.setTextColor(0);
+        y += r.big ? 8 : 6;
+      });
+
+      doc.save(`GST_Filing_Summary_${periodLabel.replace(/\s+/g, '_')}.pdf`);
+      toast('GST Filing Summary PDF exported successfully', 'success');
+    } catch {
+      toast('Failed to generate GST Filing Summary PDF', 'error');
+    }
+  };
+
   // ========== RENDER ==========
-  const totalTax = grandTotals.cgst + grandTotals.sgst + grandTotals.igst;
+  const totalTax = grandTotals.cgst + grandTotals.sgst + grandTotals.igst + (grandTotals.cess || 0);
   const netPayable = netTax.igst + netTax.cgst + netTax.sgst;
 
   return (
@@ -1286,31 +1427,266 @@ export default function GSTReturns() {
         </div>
       )}
 
-      {/* Compact summary + tabs in one row */}
-      <div style={{ display: 'flex', gap: '1rem', alignItems: 'stretch', marginBottom: '1rem', flexWrap: 'wrap' }}>
-        <div className="glass-panel" style={{ padding: '0.75rem 1rem', flex: 1, minWidth: '200px', display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
-          <div><p className="stat-label" style={{ margin: 0, fontSize: '0.7rem' }}>Invoices</p><strong style={{ fontSize: '1.25rem' }}>{filteredBills.length}</strong></div>
-          <div style={{ width: '1px', height: '2rem', background: 'var(--border)' }} />
-          <div><p className="stat-label" style={{ margin: 0, fontSize: '0.7rem' }}>Taxable</p><strong style={{ fontSize: '1rem' }}>{formatCurrency(grandTotals.taxable)}</strong></div>
-          <div style={{ width: '1px', height: '2rem', background: 'var(--border)' }} />
-          <div><p className="stat-label" style={{ margin: 0, fontSize: '0.7rem' }}>Tax</p><strong style={{ fontSize: '1rem' }}>{formatCurrency(totalTax)}</strong></div>
-          <div style={{ width: '1px', height: '2rem', background: 'var(--border)' }} />
-          <div><p className="stat-label" style={{ margin: 0, fontSize: '0.7rem' }}>Net Payable</p><strong style={{ fontSize: '1rem', color: 'var(--primary)' }}>{formatCurrency(netPayable)}</strong></div>
+      {/* 1. TOP EXECUTIVE 4-CARD GST KPI RIBBON (Vyapar Desktop Standard) */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))',
+        gap: '0.85rem',
+        marginBottom: '1rem'
+      }}>
+        {/* Outward Taxable Turnover */}
+        <div style={{
+          background: 'var(--card-bg, #ffffff)',
+          border: '1px solid var(--border-color, #e5e7eb)',
+          borderRadius: '10px',
+          padding: '0.9rem 1.1rem',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.9rem'
+        }}>
+          <div style={{
+            width: '42px',
+            height: '42px',
+            borderRadius: '9px',
+            background: '#eff6ff',
+            color: '#2563eb',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0
+          }}>
+            <TrendingUp size={22} />
+          </div>
+          <div>
+            <div style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-secondary, #6b7280)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              Taxable Turnover
+            </div>
+            <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#2563eb', lineHeight: 1.2 }}>
+              {formatCurrency(grandTotals.taxable)}
+            </div>
+            <div style={{ fontSize: '0.72rem', color: '#6b7280', marginTop: '2px' }}>
+              Across {filteredBills.length} sales invoice{filteredBills.length !== 1 ? 's' : ''}
+            </div>
+          </div>
+        </div>
+
+        {/* Total Output GST Liability */}
+        <div style={{
+          background: 'var(--card-bg, #ffffff)',
+          border: '1px solid var(--border-color, #e5e7eb)',
+          borderRadius: '10px',
+          padding: '0.9rem 1.1rem',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.9rem'
+        }}>
+          <div style={{
+            width: '42px',
+            height: '42px',
+            borderRadius: '9px',
+            background: '#fff7ed',
+            color: '#ea580c',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0
+          }}>
+            <Percent size={22} />
+          </div>
+          <div>
+            <div style={{ fontSize: '0.72rem', fontWeight: 600, color: '#9a3412', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              Output GST Liability
+            </div>
+            <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#ea580c', lineHeight: 1.2 }}>
+              {formatCurrency(totalTax)}
+            </div>
+            <div style={{ fontSize: '0.72rem', color: '#6b7280', marginTop: '2px' }}>
+              CGST + SGST + IGST + Cess
+            </div>
+          </div>
+        </div>
+
+        {/* Total Eligible ITC Available */}
+        <div style={{
+          background: 'var(--card-bg, #ffffff)',
+          border: '1px solid var(--border-color, #e5e7eb)',
+          borderRadius: '10px',
+          padding: '0.9rem 1.1rem',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.9rem'
+        }}>
+          <div style={{
+            width: '42px',
+            height: '42px',
+            borderRadius: '9px',
+            background: '#ecfdf5',
+            color: '#059669',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0
+          }}>
+            <ShieldCheck size={22} />
+          </div>
+          <div>
+            <div style={{ fontSize: '0.72rem', fontWeight: 600, color: '#065f46', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              Input Tax Credit (ITC)
+            </div>
+            <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#059669', lineHeight: 1.2 }}>
+              {formatCurrency(itcTotal)}
+            </div>
+            <div style={{ fontSize: '0.72rem', color: '#6b7280', marginTop: '2px' }}>
+              From purchases & expenses
+            </div>
+          </div>
+        </div>
+
+        {/* Net GST Cash Payable */}
+        <div style={{
+          background: 'var(--card-bg, #ffffff)',
+          border: '1px solid var(--border-color, #e5e7eb)',
+          borderRadius: '10px',
+          padding: '0.9rem 1.1rem',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.9rem'
+        }}>
+          <div style={{
+            width: '42px',
+            height: '42px',
+            borderRadius: '9px',
+            background: netPayable > 0 ? '#fff1f2' : '#f0fdf4',
+            color: netPayable > 0 ? '#e11d48' : '#16a34a',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0
+          }}>
+            <Wallet size={22} />
+          </div>
+          <div>
+            <div style={{ fontSize: '0.72rem', fontWeight: 600, color: netPayable > 0 ? '#9f1239' : '#166534', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              Net Cash Payable
+            </div>
+            <div style={{ fontSize: '1.4rem', fontWeight: 700, color: netPayable > 0 ? '#e11d48' : '#16a34a', lineHeight: 1.2 }}>
+              {netPayable > 0 ? formatCurrency(netPayable) : '₹0.00 (Surplus)'}
+            </div>
+            <div style={{ fontSize: '0.72rem', color: '#6b7280', marginTop: '2px' }}>
+              {netPayable > 0 ? 'Pay via Challan PMT-06' : 'Full tax covered by ITC'}
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Tabs */}
-      <div style={{ display: 'flex', gap: '0.35rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
+      {/* 2. COMPLIANCE & FILING TOOLBAR (Portal Sync & CA PDF Export) */}
+      <div style={{
+        background: 'var(--card-bg, #ffffff)',
+        border: '1px solid var(--border-color, #e5e7eb)',
+        borderRadius: '10px',
+        padding: '0.75rem 1rem',
+        marginBottom: '1rem',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        flexWrap: 'wrap',
+        gap: '0.75rem'
+      }}>
+        {/* Filing Status Badges with Click-to-Toggle */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+          <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-secondary, #475569)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+            Portal Status:
+          </span>
+
+          <button
+            type="button"
+            onClick={() => toggleFiled('gstr1')}
+            title={periodFiling.gstr1 ? 'Click to mark as pending' : 'Click to mark as filed'}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.35rem',
+              fontSize: '0.78rem',
+              padding: '0.35rem 0.75rem',
+              borderRadius: '20px',
+              border: '1px solid ' + (periodFiling.gstr1 ? '#86efac' : '#fca5a5'),
+              cursor: 'pointer',
+              background: periodFiling.gstr1 ? '#ecfdf5' : '#fef2f2',
+              color: periodFiling.gstr1 ? '#059669' : '#dc2626',
+              fontWeight: 700
+            }}>
+            {periodFiling.gstr1 ? <CheckCircle2 size={13} /> : <AlertTriangle size={13} />}
+            GSTR-1: {periodFiling.gstr1 ? 'Filed' : 'Pending'}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => toggleFiled('gstr3b')}
+            title={periodFiling.gstr3b ? 'Click to mark as pending' : 'Click to mark as filed'}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.35rem',
+              fontSize: '0.78rem',
+              padding: '0.35rem 0.75rem',
+              borderRadius: '20px',
+              border: '1px solid ' + (periodFiling.gstr3b ? '#86efac' : '#fca5a5'),
+              cursor: 'pointer',
+              background: periodFiling.gstr3b ? '#ecfdf5' : '#fef2f2',
+              color: periodFiling.gstr3b ? '#059669' : '#dc2626',
+              fontWeight: 700
+            }}>
+            {periodFiling.gstr3b ? <CheckCircle2 size={13} /> : <AlertTriangle size={13} />}
+            GSTR-3B: {periodFiling.gstr3b ? 'Filed' : 'Pending'}
+          </button>
+        </div>
+
+        {/* Global Action Buttons */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+          <button
+            onClick={exportGSTR1JSON}
+            className="btn btn-primary"
+            style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', padding: '0.4rem 0.85rem', fontSize: '0.82rem', fontWeight: 700 }}>
+            <Zap size={14} /> Download GSTR-1 JSON
+          </button>
+
+          <button
+            onClick={exportFilingSummaryPDF}
+            className="btn btn-secondary"
+            style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', padding: '0.4rem 0.85rem', fontSize: '0.82rem', fontWeight: 600 }}>
+            <Download size={14} /> Export CA Summary PDF
+          </button>
+
+          <a
+            href="https://gst.gov.in"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn btn-secondary"
+            style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', padding: '0.4rem 0.85rem', fontSize: '0.82rem', fontWeight: 600 }}>
+            <ExternalLink size={14} /> GST Portal
+          </a>
+        </div>
+      </div>
+
+      {/* 3. RETURN NAVIGATION TABS */}
+      <div style={{ display: 'flex', gap: '0.4rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
         {[
-          { id: 'gstr1', label: 'GSTR-1', icon: BarChart3 },
-          { id: 'gstr3b', label: 'GSTR-3B', icon: FileText },
-          { id: 'gstr2b', label: 'GSTR-2B Reconciliation', icon: CheckCircle },
-          { id: 'tds', label: 'TDS / TCS Report', icon: FileText },
-          { id: 'guide', label: 'Filing Guide', icon: BookOpen },
+          { id: 'gstr1', label: `GSTR-1 Outward (${b2bRows.length + b2cBills.length} bills)`, icon: BarChart3 },
+          { id: 'gstr3b', label: 'GSTR-3B Summary & Offset', icon: FileText },
+          { id: 'gstr2b', label: 'GSTR-2B ITC Reconciliation', icon: CheckCircle },
+          { id: 'tds', label: 'TDS / TCS Register', icon: FileText },
+          { id: 'guide', label: 'Filing Checklist & Guide', icon: BookOpen },
         ].map(tab => (
-          <button key={tab.id} className={`btn ${activeTab === tab.id ? 'btn-primary' : 'btn-secondary'}`}
-            onClick={() => setActiveTab(tab.id)} style={{ fontSize: '0.82rem', padding: '0.4rem 0.75rem' }}>
-            <tab.icon size={14} /> {tab.label}
+          <button
+            key={tab.id}
+            className={`btn ${activeTab === tab.id ? 'btn-primary' : 'btn-secondary'}`}
+            onClick={() => setActiveTab(tab.id)}
+            style={{ fontSize: '0.84rem', padding: '0.45rem 0.85rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+            <tab.icon size={15} /> {tab.label}
           </button>
         ))}
       </div>

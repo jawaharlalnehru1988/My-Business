@@ -1,9 +1,12 @@
 package com.company.accounting_service.domain.client.dto;
 
+import com.company.accounting_service.core.json.ExtensibleDTO;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 
 @Data
-public class ClientDTO {
+@EqualsAndHashCode(callSuper = false)
+public class ClientDTO extends ExtensibleDTO {
     private Long id;
     private String name;
     private String address;

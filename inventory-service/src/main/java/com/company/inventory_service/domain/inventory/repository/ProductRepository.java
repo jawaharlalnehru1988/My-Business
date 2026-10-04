@@ -2,8 +2,20 @@ package com.company.inventory_service.domain.inventory.repository;
 
 import com.company.inventory_service.domain.inventory.entity.Product;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+
+import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface ProductRepository extends JpaRepository<Product, Long> {
+
+    @Query("SELECT p FROM Product p WHERE (p.tenantId = :tenantId OR (p.tenantId IS NULL AND :tenantId = 1))")
+    List<Product> findByTenant(@Param("tenantId") Long tenantId);
+
+    @Query("SELECT p FROM Product p WHERE p.id = :id AND (p.tenantId = :tenantId OR (p.tenantId IS NULL AND :tenantId = 1))")
+    Optional<Product> findByIdAndTenant(@Param("id") Long id, @Param("tenantId") Long tenantId);
 }
+

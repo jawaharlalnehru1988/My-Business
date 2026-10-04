@@ -64,6 +64,19 @@ public class Invoice {
     @Column(name = "options_json", columnDefinition = "TEXT")
     private String optionsJson;
 
+    @Column(name = "extra_json", columnDefinition = "TEXT")
+    private String extraJson;
+
+    @Column(name = "is_deleted")
+    @Builder.Default
+    private Boolean isDeleted = false;
+
+    @Column(name = "deleted_at")
+    private java.time.LocalDateTime deletedAt;
+
+    @Column(name = "tenant_id")
+    private Long tenantId;
+
     @OneToMany(mappedBy = "invoice", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<InvoiceLineItem> items = new ArrayList<>();

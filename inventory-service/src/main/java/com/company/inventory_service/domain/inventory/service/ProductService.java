@@ -10,6 +10,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import com.company.inventory_service.core.tenant.TenantContext;
+
 @Service
 @RequiredArgsConstructor
 public class ProductService {
@@ -18,7 +20,7 @@ public class ProductService {
 
     @Transactional(readOnly = true)
     public List<ProductDTO> getAllProducts() {
-        return productRepository.findAll().stream()
+        return productRepository.findByTenant(TenantContext.getCurrentTenant()).stream()
                 .map(this::mapToDTO)
                 .collect(Collectors.toList());
     }
@@ -27,10 +29,11 @@ public class ProductService {
     public ProductDTO saveProduct(ProductDTO dto) {
         Product product;
         if (dto.getId() != null) {
-            product = productRepository.findById(dto.getId())
+            product = productRepository.findByIdAndTenant(dto.getId(), TenantContext.getCurrentTenant())
                     .orElseThrow(() -> new RuntimeException("Product not found"));
         } else {
             product = new Product();
+            product.setTenantId(TenantContext.getCurrentTenant());
         }
 
         product.setName(dto.getName());
@@ -42,6 +45,7 @@ public class ProductService {
         product.setUnit(dto.getUnit());
         product.setStock(dto.getStock());
         product.setDescription(dto.getDescription());
+        product.setExtraJson(com.company.inventory_service.core.json.ExtraJson.write(dto.extraFields()));
 
         product = productRepository.save(product);
         return mapToDTO(product);
@@ -49,7 +53,9 @@ public class ProductService {
 
     @Transactional
     public void deleteProduct(Long id) {
-        productRepository.deleteById(id);
+        Product product = productRepository.findByIdAndTenant(id, TenantContext.getCurrentTenant())
+                .orElseThrow(() -> new RuntimeException("Product not found"));
+        productRepository.delete(product);
     }
 
     private ProductDTO mapToDTO(Product product) {
@@ -64,6 +70,7 @@ public class ProductService {
         dto.setUnit(product.getUnit());
         dto.setStock(product.getStock());
         dto.setDescription(product.getDescription());
+        dto.extraFields().putAll(com.company.inventory_service.core.json.ExtraJson.read(product.getExtraJson()));
         return dto;
     }
 }

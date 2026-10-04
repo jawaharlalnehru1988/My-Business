@@ -1,12 +1,15 @@
 package com.company.accounting_service.domain.recurring.dto;
 
+import com.company.accounting_service.core.json.ExtensibleDTO;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 
 @Data
-public class RecurringInvoiceDTO {
+@EqualsAndHashCode(callSuper = false)
+public class RecurringInvoiceDTO extends ExtensibleDTO {
     private Long id;
     private String clientName;
     private String clientState;

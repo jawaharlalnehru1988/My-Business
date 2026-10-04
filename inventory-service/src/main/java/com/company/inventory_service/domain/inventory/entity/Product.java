@@ -48,4 +48,10 @@ public class Product {
 
     @Column(length = 1000)
     private String description;
+
+    @Column(name = "extra_json", columnDefinition = "TEXT")
+    private String extraJson;
+
+    @Column(name = "tenant_id")
+    private Long tenantId;
 }

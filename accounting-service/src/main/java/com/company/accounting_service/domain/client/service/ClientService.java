@@ -10,6 +10,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import com.company.accounting_service.core.tenant.TenantContext;
+
 @Service
 @RequiredArgsConstructor
 public class ClientService {
@@ -18,7 +20,7 @@ public class ClientService {
 
     @Transactional(readOnly = true)
     public List<ClientDTO> getAllClients() {
-        return clientRepository.findAll().stream()
+        return clientRepository.findByTenant(TenantContext.getCurrentTenant()).stream()
                 .map(this::mapToDTO)
                 .collect(Collectors.toList());
     }
@@ -27,10 +29,11 @@ public class ClientService {
     public ClientDTO saveClient(ClientDTO dto) {
         Client client;
         if (dto.getId() != null) {
-            client = clientRepository.findById(dto.getId())
+            client = clientRepository.findByIdAndTenant(dto.getId(), TenantContext.getCurrentTenant())
                     .orElseThrow(() -> new RuntimeException("Client not found"));
         } else {
             client = new Client();
+            client.setTenantId(TenantContext.getCurrentTenant());
         }
 
         client.setName(dto.getName());
@@ -46,6 +49,7 @@ public class ClientService {
         client.setPreferredPaperSize(dto.getPreferredPaperSize());
         client.setPreferredCurrency(dto.getPreferredCurrency());
         client.setAutoPrint(dto.getAutoPrint());
+        client.setExtraJson(com.company.accounting_service.core.json.ExtraJson.write(dto.extraFields()));
 
         client = clientRepository.save(client);
         return mapToDTO(client);
@@ -53,7 +57,9 @@ public class ClientService {
 
     @Transactional
     public void deleteClient(Long id) {
-        clientRepository.deleteById(id);
+        Client client = clientRepository.findByIdAndTenant(id, TenantContext.getCurrentTenant())
+                .orElseThrow(() -> new RuntimeException("Client not found"));
+        clientRepository.delete(client);
     }
 
     private ClientDTO mapToDTO(Client client) {
@@ -72,6 +78,7 @@ public class ClientService {
         dto.setPreferredPaperSize(client.getPreferredPaperSize());
         dto.setPreferredCurrency(client.getPreferredCurrency());
         dto.setAutoPrint(client.getAutoPrint());
+        dto.extraFields().putAll(com.company.accounting_service.core.json.ExtraJson.read(client.getExtraJson()));
         return dto;
     }
 }

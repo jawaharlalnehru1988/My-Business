@@ -44,6 +44,9 @@ public class RecurringInvoice {
 
     private Boolean active;
 
+    @Column(name = "extra_json", columnDefinition = "TEXT")
+    private String extraJson;
+
     @OneToMany(mappedBy = "recurringInvoice", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<RecurringInvoiceLineItem> items = new ArrayList<>();

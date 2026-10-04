@@ -1,0 +1,16 @@
+{
+  "name": "Free GST Billing & Accounting Software",
+  "short_name": "GST Billing",
+  "description": "Open-Source GST Invoice Generator & Accounting Microservices",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#1e40af",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}

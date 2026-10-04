@@ -14,6 +14,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import com.company.accounting_service.core.tenant.TenantContext;
+
 @Service
 @RequiredArgsConstructor
 public class BusinessProfileService {
@@ -23,14 +25,14 @@ public class BusinessProfileService {
 
     @Transactional(readOnly = true)
     public List<BusinessProfileDTO> getAllProfiles() {
-        return profileRepository.findAll().stream()
+        return profileRepository.findByTenant(TenantContext.getCurrentTenant()).stream()
                 .map(this::mapToDTO)
                 .collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)
     public BusinessProfileDTO getDefaultProfile() {
-        return profileRepository.findAll().stream().findFirst()
+        return profileRepository.findByTenant(TenantContext.getCurrentTenant()).stream().findFirst()
                 .map(this::mapToDTO)
                 .orElse(new BusinessProfileDTO());
     }
@@ -39,15 +41,15 @@ public class BusinessProfileService {
     public BusinessProfileDTO saveProfile(BusinessProfileDTO dto) {
         BusinessProfile profile;
         if (dto.getId() != null) {
-            profile = profileRepository.findById(dto.getId())
+            profile = profileRepository.findByIdAndTenant(dto.getId(), TenantContext.getCurrentTenant())
                     .orElseThrow(() -> new RuntimeException("Profile not found"));
         } else {
-            // For the default `/api/profile` endpoint, if id is null, we either update the first or create new
-            List<BusinessProfile> all = profileRepository.findAll();
+            List<BusinessProfile> all = profileRepository.findByTenant(TenantContext.getCurrentTenant());
             if (!all.isEmpty()) {
                 profile = all.get(0);
             } else {
                 profile = new BusinessProfile();
+                profile.setTenantId(TenantContext.getCurrentTenant());
             }
         }
 
@@ -77,6 +79,7 @@ public class BusinessProfileService {
         } catch (JsonProcessingException e) {
             throw new RuntimeException("Failed to serialize payment accounts", e);
         }
+        profile.setExtraJson(com.company.accounting_service.core.json.ExtraJson.write(dto.extraFields()));
 
         profile = profileRepository.save(profile);
         return mapToDTO(profile);
@@ -86,10 +89,11 @@ public class BusinessProfileService {
     public BusinessProfileDTO saveSpecificProfile(BusinessProfileDTO dto) {
         BusinessProfile profile;
         if (dto.getId() != null) {
-            profile = profileRepository.findById(dto.getId())
+            profile = profileRepository.findByIdAndTenant(dto.getId(), TenantContext.getCurrentTenant())
                     .orElseThrow(() -> new RuntimeException("Profile not found"));
         } else {
             profile = new BusinessProfile();
+            profile.setTenantId(TenantContext.getCurrentTenant());
         }
 
         // Duplicated logic for saving specific profile (handles multi-business)
@@ -119,6 +123,7 @@ public class BusinessProfileService {
         } catch (JsonProcessingException e) {
             throw new RuntimeException("Failed to serialize payment accounts", e);
         }
+        profile.setExtraJson(com.company.accounting_service.core.json.ExtraJson.write(dto.extraFields()));
 
         profile = profileRepository.save(profile);
         return mapToDTO(profile);
@@ -126,7 +131,9 @@ public class BusinessProfileService {
 
     @Transactional
     public void deleteProfile(Long id) {
-        profileRepository.deleteById(id);
+        BusinessProfile profile = profileRepository.findByIdAndTenant(id, TenantContext.getCurrentTenant())
+                .orElseThrow(() -> new RuntimeException("Profile not found"));
+        profileRepository.delete(profile);
     }
 
     private BusinessProfileDTO mapToDTO(BusinessProfile profile) {
@@ -157,6 +164,7 @@ public class BusinessProfileService {
             throw new RuntimeException("Failed to deserialize payment accounts", e);
         }
 
+        dto.extraFields().putAll(com.company.accounting_service.core.json.ExtraJson.read(profile.getExtraJson()));
         return dto;
     }
 }

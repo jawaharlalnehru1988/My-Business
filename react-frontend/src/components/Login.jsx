@@ -22,7 +22,14 @@ export default function Login({ onLoginSuccess }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ credential: credentialResponse.credential })
       });
-      if (!res.ok) throw new Error('Google authentication failed');
+      if (!res.ok) {
+        let errMsg = 'Google authentication failed (' + res.status + ')';
+        try {
+          const errData = await res.json();
+          if (errData.message) errMsg = errData.message;
+        } catch { /* ignore non-json */ }
+        throw new Error(errMsg);
+      }
       const data = await res.json();
       localStorage.setItem('jwt_token', data.token);
       localStorage.setItem('tenantId', data.tenantId || '');
@@ -101,18 +108,22 @@ export default function Login({ onLoginSuccess }) {
           </p>
         </div>
 
-        {/* Google Login */}
-        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1.5rem' }}>
+        {/* Google Login with origin indicator */}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: '1.25rem', gap: '8px' }}>
           <GoogleLogin
             onSuccess={handleGoogleSuccess}
             onError={() => {
-              setError('Google Login Failed');
+              setError('Google OAuth Error (origin_mismatch). Please open http://localhost:4200 (registered in Google Cloud) or use 1-Click Demo Login below.');
             }}
-            useOneTap
           />
+          {window.location.port !== '4200' && window.location.hostname === 'localhost' && (
+            <p style={{ margin: 0, fontSize: '0.78rem', color: '#64748b', textAlign: 'center' }}>
+              💡 Google Sign-In is configured for <a href="http://localhost:4200" style={{ color: '#2563eb', fontWeight: 600 }}>http://localhost:4200</a>.
+            </p>
+          )}
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', margin: '1.5rem 0' }}>
+        <div style={{ display: 'flex', alignItems: 'center', margin: '1rem 0' }}>
           <div style={{ flex: 1, height: '1px', background: '#e2e8f0' }}></div>
           <span style={{ padding: '0 10px', color: '#94a3b8', fontSize: '0.85rem' }}>OR</span>
           <div style={{ flex: 1, height: '1px', background: '#e2e8f0' }}></div>
@@ -215,6 +226,61 @@ export default function Login({ onLoginSuccess }) {
             }}
           >
             {loading ? 'Signing in...' : 'Sign In'}
+          </button>
+
+          <button
+            type="button"
+            onClick={async () => {
+              setUsername('admin@system.com');
+              setPassword('admin123');
+              setLoading(true);
+              setError('');
+              try {
+                let res = await fetch('/api/v1/auth/login', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ email: 'admin@system.com', username: 'admin@system.com', password: 'admin123' })
+                });
+                if (!res.ok) {
+                  res = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: 'admin@system.com', username: 'admin@system.com', password: 'admin123' })
+                  });
+                }
+                if (!res.ok) throw new Error('Invalid credentials');
+                const data = await res.json();
+                if (data.token) {
+                  localStorage.setItem('jwt_token', data.token);
+                  localStorage.setItem('user_email', 'admin@system.com');
+                  if (data.tenantId) localStorage.setItem('tenantId', String(data.tenantId));
+                  if (data.businessName) localStorage.setItem('businessName', data.businessName);
+                  toast('Logged in as Demo Admin!', 'success');
+                  onLoginSuccess();
+                }
+              } catch (err) {
+                setError(err.message || 'Auto-login failed.');
+              } finally {
+                setLoading(false);
+              }
+            }}
+            style={{
+              background: '#eff6ff',
+              color: '#1d4ed8',
+              border: '1px dashed #93c5fd',
+              borderRadius: '6px',
+              padding: '0.65rem',
+              fontSize: '0.88rem',
+              fontWeight: 600,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px',
+              transition: 'background 0.2s'
+            }}
+          >
+            ⚡ 1-Click Instant Demo Login (admin@system.com)
           </button>
         </form>
 

@@ -1,12 +1,15 @@
 package com.company.accounting_service.domain.purchase.dto;
 
+import com.company.accounting_service.core.json.ExtensibleDTO;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 
 @Data
-public class PurchaseDTO {
+@EqualsAndHashCode(callSuper = false)
+public class PurchaseDTO extends ExtensibleDTO {
     private Long id;
     private LocalDate date;
     private String supplierName;

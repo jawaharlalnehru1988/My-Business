@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo, lazy, Suspense } from 'react';
 import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
-import { Home, FileText, Settings, Plus, Users, Package, BarChart3, Wallet, RefreshCw, Receipt, BookOpen, Moon, Sun, Download, X, ShoppingCart, ChevronDown, ChevronUp, Building2, Pencil, HelpCircle, Search, Command, Bell, Calculator, User, LogOut, Barcode, Percent } from 'lucide-react';
+import { Home, FileText, Settings, Plus, Users, Package, BarChart3, Wallet, RefreshCw, Receipt, BookOpen, Moon, Sun, Download, X, ShoppingCart, ChevronDown, ChevronUp, Building2, Pencil, HelpCircle, Search, Command, Bell, Calculator, User, LogOut, Barcode, Percent, Database } from 'lucide-react';
 import { getAllProfiles, saveProfile, getEnabledModules, getAllBills, getAllProducts, getStockAlertSettings, getAllClients, getProfile } from './store';
 import { isModuleEnabled, getUpcomingFilings } from './utils';
 // v1.10.4 — Route-level lazy loading. Prior App.jsx synchronously
@@ -24,6 +24,7 @@ import SetupBusiness from './components/SetupBusiness';
 import ToastContainer from './components/Toast';
 import ConfirmModalContainer from './components/ConfirmModal';
 import Onboarding from './components/Onboarding';
+import CompanySwitcherModal from './components/CompanySwitcherModal';
 const SettingsView = lazy(() => import('./components/SettingsView'));
 const ClientsView = lazy(() => import('./components/ClientsView'));
 const SuppliersView = lazy(() => import('./components/SuppliersView'));
@@ -38,6 +39,7 @@ const GSTReturns = lazy(() => import('./components/GSTReturns'));
 const IncomeTax = lazy(() => import('./components/IncomeTax'));
 const PurchaseBills = lazy(() => import('./components/PurchaseBills'));
 const UserGuideView = lazy(() => import('./components/UserGuideView'));
+const BackupRestoreHub = lazy(() => import('./components/BackupRestoreHub'));
 import { getPrintSettings } from './utils/printSettings';
 import Login from './components/Login';
 import Registration from './components/Registration';
@@ -94,6 +96,11 @@ function App() {
     return localStorage.getItem('freegstbill_theme') === 'dark';
   });
   const [saleMenuOpen, setSaleMenuOpen] = useState(true);
+  const [purchaseMenuOpen, setPurchaseMenuOpen] = useState(false);
+  const [purchaseDocType, setPurchaseDocType] = useState('purchase-bills');
+  const [purchaseAutoNew, setPurchaseAutoNew] = useState(false);
+  const [partiesMenuOpen, setPartiesMenuOpen] = useState(false);
+  const [reportsMenuOpen, setReportsMenuOpen] = useState(false);
   const [dashboardTypeFilter, setDashboardTypeFilter] = useState('all');
   const [receiptAutoOpen, setReceiptAutoOpen] = useState(false);
   const [lastView, setLastView] = useState('sale-invoices');
@@ -102,6 +109,7 @@ function App() {
   const [serverStatus, setServerStatus] = useState('checking'); // 'checking' | 'online' | 'offline'
   const [allProfiles, setAllProfiles] = useState([]);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [showCompanyModal, setShowCompanyModal] = useState(false);
   const [updateInfo, setUpdateInfo] = useState(null);
   const [showUpdateModal, setShowUpdateModal] = useState(false);
 
@@ -397,15 +405,35 @@ function App() {
 
   const handleSwitchProfile = async (bp) => {
     setShowProfileMenu(false);
+    const newTenant = bp.id || bp.tenantId || (bp.businessName ? Math.abs(bp.businessName.split('').reduce((a,b)=>{a=((a<<5)-a)+b.charCodeAt(0);return a&a},0)) : 1);
+    localStorage.setItem('tenantId', String(newTenant));
     const loaded = { ...bp };
     delete loaded.id;
     await saveProfile(loaded);
     setProfile(loaded);
+    try {
+      const list = await getAllProfiles();
+      setAllProfiles(list);
+    } catch { /* ignore */ }
+    window.location.reload();
   };
 
-  const handleNewInvoice = (type = 'tax-invoice') => {
+  const handleNewInvoice = (param = 'tax-invoice') => {
     sessionStorage.removeItem('gst_invoiceDraft');
-    setEditingBill({ invoiceType: type || 'tax-invoice' });
+    let targetType = 'tax-invoice';
+    let extra = {};
+
+    if (typeof param === 'string' && param.trim()) {
+      targetType = param.trim();
+    } else if (param && typeof param === 'object' && !param.nativeEvent && !param.target && !param.preventDefault) {
+      if (typeof param.invoiceType === 'string' && param.invoiceType.trim()) {
+        targetType = param.invoiceType.trim();
+      }
+      extra = { ...param };
+      delete extra.invoiceType;
+    }
+
+    setEditingBill({ ...extra, invoiceType: targetType });
     setCurrentView('new');
   };
 
@@ -459,6 +487,70 @@ function App() {
       onView: () => setCurrentView('credit-note'),
       onCreate: () => { handleNewInvoice('credit-note'); }
     },
+  ];
+
+  const purchaseSubItems = [
+    {
+      id: 'purchases',
+      label: 'Purchase Bills',
+      docType: 'purchase-bills',
+      onView: () => { setPurchaseDocType('purchase-bills'); setCurrentView('purchases'); },
+      onCreate: () => { setPurchaseDocType('purchase-bills'); setPurchaseAutoNew(true); setCurrentView('purchases'); }
+    },
+    {
+      id: 'payment-out',
+      label: 'Payment-Out',
+      docType: 'payment-out',
+      onView: () => { setPurchaseDocType('payment-out'); setCurrentView('purchases'); },
+      onCreate: () => { setPurchaseDocType('payment-out'); setPurchaseAutoNew(true); setCurrentView('purchases'); }
+    },
+    {
+      id: 'purchase-order',
+      label: 'Purchase Order',
+      docType: 'purchase-order',
+      onView: () => { setPurchaseDocType('purchase-order'); setCurrentView('purchases'); },
+      onCreate: () => { setPurchaseDocType('purchase-order'); setPurchaseAutoNew(true); setCurrentView('purchases'); }
+    },
+    {
+      id: 'purchase-return',
+      label: 'Purchase Return',
+      docType: 'purchase-return',
+      onView: () => { setPurchaseDocType('purchase-return'); setCurrentView('purchases'); },
+      onCreate: () => { setPurchaseDocType('purchase-return'); setPurchaseAutoNew(true); setCurrentView('purchases'); }
+    }
+  ];
+
+  const partiesSubItems = [
+    {
+      id: 'clients',
+      label: 'Customers',
+      onView: () => setCurrentView('clients'),
+      onCreate: () => setCurrentView('clients')
+    },
+    {
+      id: 'suppliers',
+      label: 'Suppliers (Vendors)',
+      onView: () => setCurrentView('suppliers'),
+      onCreate: () => setCurrentView('suppliers')
+    }
+  ];
+
+  const reportsSubItems = [
+    {
+      id: 'reports',
+      label: 'Reports & Daybook',
+      onView: () => setCurrentView('reports')
+    },
+    {
+      id: 'filing',
+      label: 'GST Returns (GSTR-1, 3B)',
+      onView: () => setCurrentView('filing')
+    },
+    {
+      id: 'incometax',
+      label: 'Income Tax Computation',
+      onView: () => setCurrentView('incometax')
+    }
   ];
 
   const handleEditInvoice = (bill) => {
@@ -739,6 +831,20 @@ function App() {
   const appLayout = (
     <div className="app-layout">
       {showWizard && <SetupWizard onClose={() => setShowWizard(false)} />}
+      <CompanySwitcherModal
+        isOpen={showCompanyModal}
+        onClose={() => setShowCompanyModal(false)}
+        profile={profile}
+        allProfiles={allProfiles}
+        onSwitchProfile={handleSwitchProfile}
+        onProfilesUpdated={async () => {
+          try {
+            const list = await getAllProfiles();
+            setAllProfiles(list);
+          } catch { /* ignore */ }
+        }}
+        onOpenSettings={() => setCurrentView('settings')}
+      />
       {showResumeSetupPill && (
         <button type="button"
           onClick={() => setShowWizard(true)}
@@ -760,8 +866,10 @@ function App() {
             <FileText size={22} />
           </div>
           <div>
-            <h2 className="sidebar-title">GST Billing</h2>
-            <p className="sidebar-subtitle">by DiceCodes</p>
+            <h2 className="sidebar-title" style={{ fontSize: '0.98rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '170px' }}>
+              {profile?.businessName || 'Sri Raani Dry Fruits'}
+            </h2>
+            <p className="sidebar-subtitle">{profile?.gstin || 'Vyapar Edition'}</p>
           </div>
         </div>
 
@@ -807,7 +915,7 @@ function App() {
         </div>
 
         <nav className="sidebar-nav">
-          {/* Dashboard Item */}
+          {/* 1. Dashboard */}
           <button
             className={`nav-btn ${currentView === 'dashboard' ? 'nav-btn-active' : ''}`}
             onClick={() => { setDashboardTypeFilter('all'); setCurrentView('dashboard'); }}
@@ -815,7 +923,83 @@ function App() {
             <Home size={18} /> Dashboard
           </button>
 
-          {/* Sale Collapsible Group */}
+          {/* 2. Parties (Collapsible) */}
+          <div style={{ marginBottom: '0.25rem' }}>
+            <button
+              className={`nav-btn ${(currentView === 'clients' || currentView === 'suppliers') ? 'nav-btn-active' : ''}`}
+              onClick={() => setPartiesMenuOpen(v => !v)}
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', paddingRight: '0.75rem' }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                <Users size={18} />
+                <span style={{ fontWeight: 600 }}>Parties</span>
+              </div>
+              {partiesMenuOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+            </button>
+
+            {partiesMenuOpen && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', paddingLeft: '0.75rem', marginTop: '3px' }}>
+                {partiesSubItems.map(sub => {
+                  const isSubActive = currentView === sub.id;
+                  return (
+                    <div
+                      key={sub.id}
+                      className={`nav-sub-btn ${isSubActive ? 'nav-sub-btn-active' : ''}`}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '0.45rem 0.65rem',
+                        borderRadius: '6px',
+                        fontSize: '0.84rem',
+                        color: isSubActive ? '#ffffff' : 'var(--text-subtle, #cbd5e1)',
+                        background: isSubActive ? '#2563eb' : 'transparent',
+                        fontWeight: isSubActive ? 700 : 500,
+                        cursor: 'pointer',
+                        transition: 'background 0.2s, color 0.2s',
+                        boxShadow: isSubActive ? '0 1px 3px rgba(37, 99, 235, 0.4)' : 'none',
+                      }}
+                      onClick={sub.onView}
+                    >
+                      <span>{sub.label}</span>
+                      <button
+                        type="button"
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: 'inherit',
+                          cursor: 'pointer',
+                          padding: '2px 4px',
+                          borderRadius: '3px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          opacity: isSubActive ? 1 : 0.75,
+                        }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          sub.onCreate();
+                        }}
+                        title={`Manage ${sub.label}`}
+                      >
+                        <Plus size={15} />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* 3. Items & Stock (Direct) */}
+          <button
+            className={`nav-btn ${currentView === 'inventory' ? 'nav-btn-active' : ''}`}
+            onClick={() => setCurrentView('inventory')}
+          >
+            <Package size={18} /> Items & Stock
+          </button>
+
+          {/* 4. Sale Collapsible Group */}
           <div style={{ marginBottom: '0.25rem' }}>
             <button
               className="nav-btn"
@@ -849,7 +1033,7 @@ function App() {
                       style={{
                         display: 'flex',
                         alignItems: 'center',
-                        justify: 'space-between',
+                        justifyContent: 'space-between',
                         padding: '0.45rem 0.65rem',
                         borderRadius: '6px',
                         fontSize: '0.84rem',
@@ -874,7 +1058,7 @@ function App() {
                           borderRadius: '3px',
                           display: 'flex',
                           alignItems: 'center',
-                          justify: 'center',
+                          justifyContent: 'center',
                           opacity: isSubActive ? 1 : 0.75,
                         }}
                         onClick={(e) => {
@@ -892,16 +1076,165 @@ function App() {
             )}
           </div>
 
-          {/* Remaining Nav Items */}
-          {navItems.filter(item => item.id !== 'dashboard').map(item => (
+          {/* 5. Purchase Collapsible Group */}
+          <div style={{ marginBottom: '0.25rem' }}>
             <button
-              key={item.id}
-              className={`nav-btn ${currentView === item.id ? 'nav-btn-active' : ''}`}
-              onClick={item.onClick || (() => setCurrentView(item.id))}
+              className={`nav-btn ${(currentView === 'purchases') ? 'nav-btn-active' : ''}`}
+              onClick={() => setPurchaseMenuOpen(v => !v)}
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', paddingRight: '0.75rem' }}
             >
-              <item.icon size={18} /> {item.label}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                <ShoppingCart size={18} />
+                <span style={{ fontWeight: 600 }}>Purchase</span>
+              </div>
+              {purchaseMenuOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
             </button>
-          ))}
+
+            {purchaseMenuOpen && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', paddingLeft: '0.75rem', marginTop: '3px' }}>
+                {purchaseSubItems.map(sub => {
+                  const isSubActive = currentView === 'purchases' && purchaseDocType === sub.docType;
+                  return (
+                    <div
+                      key={sub.id}
+                      className={`nav-sub-btn ${isSubActive ? 'nav-sub-btn-active' : ''}`}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '0.45rem 0.65rem',
+                        borderRadius: '6px',
+                        fontSize: '0.84rem',
+                        color: isSubActive ? '#ffffff' : 'var(--text-subtle, #cbd5e1)',
+                        background: isSubActive ? '#2563eb' : 'transparent',
+                        fontWeight: isSubActive ? 700 : 500,
+                        cursor: 'pointer',
+                        transition: 'background 0.2s, color 0.2s',
+                        boxShadow: isSubActive ? '0 1px 3px rgba(37, 99, 235, 0.4)' : 'none',
+                      }}
+                      onClick={sub.onView}
+                    >
+                      <span>{sub.label}</span>
+                      <button
+                        type="button"
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: 'inherit',
+                          cursor: 'pointer',
+                          padding: '2px 4px',
+                          borderRadius: '3px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          opacity: isSubActive ? 1 : 0.75,
+                        }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          sub.onCreate();
+                        }}
+                        title={`Manage ${sub.label}`}
+                      >
+                        <Plus size={15} />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* 6. Quick Expense */}
+          <button
+            className={`nav-btn ${currentView === 'expenses' ? 'nav-btn-active' : ''}`}
+            onClick={() => setCurrentView('expenses')}
+          >
+            <Wallet size={18} /> Quick Expense
+          </button>
+
+          {/* 7. Cash & Bank */}
+          <button
+            className={`nav-btn ${currentView === 'receipts' ? 'nav-btn-active' : ''}`}
+            onClick={() => setCurrentView('receipts')}
+          >
+            <Building2 size={18} /> Cash & Bank
+          </button>
+
+          {/* 8. Reports Collapsible Group */}
+          <div style={{ marginBottom: '0.25rem' }}>
+            <button
+              className={`nav-btn ${(currentView === 'reports' || currentView === 'filing' || currentView === 'incometax') ? 'nav-btn-active' : ''}`}
+              onClick={() => setReportsMenuOpen(v => !v)}
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', paddingRight: '0.75rem' }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                <BarChart3 size={18} />
+                <span style={{ fontWeight: 600 }}>Reports</span>
+              </div>
+              {reportsMenuOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+            </button>
+
+            {reportsMenuOpen && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', paddingLeft: '0.75rem', marginTop: '3px' }}>
+                {reportsSubItems.map(sub => {
+                  const isSubActive = currentView === sub.id;
+                  return (
+                    <div
+                      key={sub.id}
+                      className={`nav-sub-btn ${isSubActive ? 'nav-sub-btn-active' : ''}`}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '0.45rem 0.65rem',
+                        borderRadius: '6px',
+                        fontSize: '0.84rem',
+                        color: isSubActive ? '#ffffff' : 'var(--text-subtle, #cbd5e1)',
+                        background: isSubActive ? '#2563eb' : 'transparent',
+                        fontWeight: isSubActive ? 700 : 500,
+                        cursor: 'pointer',
+                        transition: 'background 0.2s, color 0.2s',
+                        boxShadow: isSubActive ? '0 1px 3px rgba(37, 99, 235, 0.4)' : 'none',
+                      }}
+                      onClick={sub.onView}
+                    >
+                      <span>{sub.label}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* 9. Tools & Utilities (Divider) */}
+          <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', margin: '0.5rem 0', paddingTop: '0.5rem' }}>
+            <span style={{ fontSize: '0.7rem', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', paddingLeft: '0.5rem', fontWeight: 600 }}>Tools</span>
+          </div>
+
+          <button
+            className={`nav-btn ${currentView === 'barcodes' ? 'nav-btn-active' : ''}`}
+            onClick={() => setCurrentView('barcodes')}
+          >
+            <Barcode size={18} /> Barcode & Thermal Slip
+          </button>
+          <button
+            className={`nav-btn ${currentView === 'recurring' ? 'nav-btn-active' : ''}`}
+            onClick={() => setCurrentView('recurring')}
+          >
+            <RefreshCw size={18} /> Recurring Bills
+          </button>
+          <button
+            className={`nav-btn ${currentView === 'backup' ? 'nav-btn-active' : ''}`}
+            onClick={() => setCurrentView('backup')}
+          >
+            <Database size={18} /> Backup & Cloud Sync
+          </button>
+          <button
+            className={`nav-btn ${currentView === 'guide' ? 'nav-btn-active' : ''}`}
+            onClick={() => setCurrentView('guide')}
+          >
+            <HelpCircle size={18} /> User Guide
+          </button>
           <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
             {/* Update-available banner — only shows when GitHub has a newer version
                 AND the user hasn't already dismissed THIS specific version. New
@@ -1007,15 +1340,41 @@ function App() {
           </div>
 
           <div className="top-navbar-right">
-            {/* Active Business Profile Chip */}
-            <div
+            {/* Active Business Profile Chip & Multi-Company Switcher */}
+            <button
+              type="button"
               className="navbar-business-chip"
-              onClick={() => setCurrentView('settings')}
-              title="Active Business Profile — Click to edit settings"
+              onClick={() => setShowCompanyModal(true)}
+              title="Switch Active Company / Sister Firm"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.55rem',
+                cursor: 'pointer',
+                border: '1.5px solid rgba(37, 99, 235, 0.35)',
+                background: 'rgba(37, 99, 235, 0.08)',
+                borderRadius: '20px',
+                padding: '0.35rem 0.85rem',
+                transition: 'all 0.15s ease'
+              }}
             >
-              <Building2 size={15} />
-              <span className="business-chip-name">{profile?.businessName || allProfiles?.[0]?.businessName || 'My Business'}</span>
-            </div>
+              <Building2 size={16} style={{ color: 'var(--primary, #2563eb)' }} />
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', textAlign: 'left', lineHeight: 1.15 }}>
+                <span className="business-chip-name" style={{ fontSize: '0.84rem', fontWeight: 700, color: 'var(--text-primary, #0f172a)' }}>
+                  {profile?.businessName || allProfiles?.[0]?.businessName || 'My Business'}
+                </span>
+                {profile?.gstin ? (
+                  <span style={{ fontSize: '0.68rem', color: 'var(--text-muted, #64748b)', fontWeight: 600 }}>
+                    GSTIN: {profile.gstin}
+                  </span>
+                ) : (
+                  <span style={{ fontSize: '0.68rem', color: 'var(--text-muted, #94a3b8)' }}>
+                    Multi-Company
+                  </span>
+                )}
+              </div>
+              <ChevronDown size={14} style={{ opacity: 0.7, marginLeft: '2px', color: 'var(--primary, #2563eb)' }} />
+            </button>
 
             {/* Logged-In User Profile Chip */}
             <div className="navbar-user-chip" title={`Logged in as ${localStorage.getItem('user_email') || 'jawaharlalnehru@gmail.com'}`}>
@@ -1037,7 +1396,7 @@ function App() {
         </header>
 
         {currentView === 'dashboard' && (
-          <Dashboard onNew={handleNewInvoice} onEdit={handleEditInvoice} onDuplicate={handleDuplicateInvoice} onConvert={handleConvertToInvoice} initialTypeFilter={dashboardTypeFilter} />
+          <Dashboard onNew={handleNewInvoice} onEdit={handleEditInvoice} onDuplicate={handleDuplicateInvoice} onConvert={handleConvertToInvoice} initialTypeFilter={dashboardTypeFilter} onNavigate={setCurrentView} />
         )}
         {currentView === 'new' && (
           <InvoiceGenerator
@@ -1079,7 +1438,12 @@ function App() {
             <ExpenseTracker />
           )}
           {currentView === 'purchases' && (
-            <PurchaseBills />
+            <PurchaseBills
+              initialDocType={purchaseDocType}
+              autoOpenNew={purchaseAutoNew}
+              onDocTypeChange={(dt) => setPurchaseDocType(dt)}
+              onResetAutoNew={() => setPurchaseAutoNew(false)}
+            />
           )}
           {currentView === 'barcodes' && (
             <BarcodeGeneratorView />
@@ -1101,6 +1465,9 @@ function App() {
           )}
           {currentView === 'guide' && (
             <UserGuideView />
+          )}
+          {currentView === 'backup' && (
+            <BackupRestoreHub />
           )}
           {currentView === 'settings' && (
             <SettingsView onSaved={(p) => setProfile(p)} />

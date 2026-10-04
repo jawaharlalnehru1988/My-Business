@@ -14,6 +14,8 @@ import java.util.stream.Collectors;
 import com.company.accounting_service.kafka.event.InventoryEvent;
 import com.company.accounting_service.kafka.producer.AccountingInventoryEventProducer;
 
+import com.company.accounting_service.core.tenant.TenantContext;
+
 @Service
 @RequiredArgsConstructor
 public class PurchaseService {
@@ -23,7 +25,7 @@ public class PurchaseService {
 
     @Transactional(readOnly = true)
     public List<PurchaseDTO> getAllPurchases() {
-        return purchaseRepository.findAll().stream()
+        return purchaseRepository.findByTenant(TenantContext.getCurrentTenant()).stream()
                 .map(this::mapToDTO)
                 .collect(Collectors.toList());
     }
@@ -32,11 +34,12 @@ public class PurchaseService {
     public PurchaseDTO savePurchase(PurchaseDTO dto) {
         Purchase purchase;
         if (dto.getId() != null) {
-            purchase = purchaseRepository.findById(dto.getId())
+            purchase = purchaseRepository.findByIdAndTenant(dto.getId(), TenantContext.getCurrentTenant())
                     .orElseThrow(() -> new RuntimeException("Purchase not found"));
             purchase.getItems().clear(); // For simplicity, rebuild items
         } else {
             purchase = new Purchase();
+            purchase.setTenantId(TenantContext.getCurrentTenant());
         }
 
         purchase.setDate(dto.getDate());
@@ -48,6 +51,7 @@ public class PurchaseService {
         purchase.setInterstate(dto.getInterstate());
         purchase.setApplyRoundOff(dto.getApplyRoundOff());
         purchase.setNote(dto.getNote());
+        purchase.setExtraJson(com.company.accounting_service.core.json.ExtraJson.write(dto.extraFields()));
 
         if (dto.getItems() != null) {
             for (PurchaseDTO.PurchaseLineItemDTO itemDto : dto.getItems()) {
@@ -87,7 +91,9 @@ public class PurchaseService {
 
     @Transactional
     public void deletePurchase(Long id) {
-        purchaseRepository.deleteById(id);
+        Purchase purchase = purchaseRepository.findByIdAndTenant(id, TenantContext.getCurrentTenant())
+                .orElseThrow(() -> new RuntimeException("Purchase not found"));
+        purchaseRepository.delete(purchase);
     }
 
     private PurchaseDTO mapToDTO(Purchase purchase) {
@@ -102,6 +108,7 @@ public class PurchaseService {
         dto.setInterstate(purchase.getInterstate());
         dto.setApplyRoundOff(purchase.getApplyRoundOff());
         dto.setNote(purchase.getNote());
+        dto.extraFields().putAll(com.company.accounting_service.core.json.ExtraJson.read(purchase.getExtraJson()));
 
         if (purchase.getItems() != null) {
             dto.setItems(purchase.getItems().stream().map(item -> {

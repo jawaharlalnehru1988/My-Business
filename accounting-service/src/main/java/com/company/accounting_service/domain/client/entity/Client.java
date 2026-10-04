@@ -39,4 +39,10 @@ public class Client {
 
     @Column(name = "auto_print")
     private Boolean autoPrint;
+
+    @Column(name = "extra_json", columnDefinition = "TEXT")
+    private String extraJson;
+
+    @Column(name = "tenant_id")
+    private Long tenantId;
 }

@@ -50,4 +50,10 @@ public class Expense {
     
     @Column(columnDefinition = "TEXT")
     private String note;
+
+    @Column(name = "extra_json", columnDefinition = "TEXT")
+    private String extraJson;
+
+    @Column(name = "tenant_id")
+    private Long tenantId;
 }

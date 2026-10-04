@@ -1,75 +1,76 @@
 server:
-  port: 8080
+  port: ${SERVER_PORT:8089}
 
 spring:
   application:
     name: api-gateway
   cloud:
     gateway:
-      mvc:
-        routes:
-          - id: auth-service
-            uri: lb://AUTH-SERVICE
-            predicates:
-              - Path=/api/v1/auth/{*path}
-          - id: accounting-service-clients
-            uri: lb://ACCOUNTING-SERVICE
-            predicates:
-              - Path=/api/v1/clients/{*path}
-          - id: accounting-service-suppliers
-            uri: lb://ACCOUNTING-SERVICE
-            predicates:
-              - Path=/api/v1/suppliers/{*path}
-          - id: accounting-service-bills
-            uri: lb://ACCOUNTING-SERVICE
-            predicates:
-              - Path=/api/v1/bills/{*path}
-          - id: accounting-service-profile
-            uri: lb://ACCOUNTING-SERVICE
-            predicates:
-              - Path=/api/v1/profile/{*path}
-          - id: accounting-service-profiles
-            uri: lb://ACCOUNTING-SERVICE
-            predicates:
-              - Path=/api/v1/profiles/{*path}
-          - id: accounting-service-expenses
-            uri: lb://ACCOUNTING-SERVICE
-            predicates:
-              - Path=/api/v1/expenses/{*path}
-          - id: accounting-service-purchases
-            uri: lb://ACCOUNTING-SERVICE
-            predicates:
-              - Path=/api/v1/purchases/{*path}
-          - id: accounting-service-recurring
-            uri: lb://ACCOUNTING-SERVICE
-            predicates:
-              - Path=/api/v1/recurring/{*path}
-          - id: accounting-service-receipts
-            uri: lb://ACCOUNTING-SERVICE
-            predicates:
-              - Path=/api/v1/receipts/{*path}
-          - id: accounting-service-templates
-            uri: lb://ACCOUNTING-SERVICE
-            predicates:
-              - Path=/api/v1/templates/{*path}
-          - id: inventory-service-products
-            uri: lb://INVENTORY-SERVICE
-            predicates:
-              - Path=/api/v1/products/{*path}
-          - id: inventory-service-barcodes
-            uri: lb://INVENTORY-SERVICE
-            predicates:
-              - Path=/api/v1/barcodes/{*path}
-          - id: inventory-service-inventory
-            uri: lb://INVENTORY-SERVICE
-            predicates:
-              - Path=/api/v1/inventory/{*path}
-          - id: monolith-backend
-            uri: lb://MONOLITH-BACKEND
-            predicates:
-              - Path=/api/{*path}
+      server:
+        webmvc:
+          routes:
+            - id: auth-service
+              uri: lb://AUTH-SERVICE
+              predicates:
+                - Path=/api/v1/auth/**, /api/auth/**
+            - id: inventory-service-products
+              uri: lb://INVENTORY-SERVICE
+              predicates:
+                - Path=/api/v1/products/**, /api/products/**
+            - id: inventory-service-barcodes
+              uri: lb://INVENTORY-SERVICE
+              predicates:
+                - Path=/api/v1/barcodes/**, /api/barcodes/**
+            - id: inventory-service-inventory
+              uri: lb://INVENTORY-SERVICE
+              predicates:
+                - Path=/api/v1/inventory/**, /api/inventory/**
+            - id: accounting-service-clients
+              uri: lb://ACCOUNTING-SERVICE
+              predicates:
+                - Path=/api/v1/clients/**, /api/clients/**
+            - id: accounting-service-suppliers
+              uri: lb://ACCOUNTING-SERVICE
+              predicates:
+                - Path=/api/v1/suppliers/**, /api/suppliers/**
+            - id: accounting-service-bills
+              uri: lb://ACCOUNTING-SERVICE
+              predicates:
+                - Path=/api/v1/bills/**, /api/bills/**
+            - id: accounting-service-profile
+              uri: lb://ACCOUNTING-SERVICE
+              predicates:
+                - Path=/api/v1/profile/**, /api/profile/**
+            - id: accounting-service-profiles
+              uri: lb://ACCOUNTING-SERVICE
+              predicates:
+                - Path=/api/v1/profiles/**, /api/profiles/**
+            - id: accounting-service-expenses
+              uri: lb://ACCOUNTING-SERVICE
+              predicates:
+                - Path=/api/v1/expenses/**, /api/expenses/**
+            - id: accounting-service-purchases
+              uri: lb://ACCOUNTING-SERVICE
+              predicates:
+                - Path=/api/v1/purchases/**, /api/purchases/**
+            - id: accounting-service-recurring
+              uri: lb://ACCOUNTING-SERVICE
+              predicates:
+                - Path=/api/v1/recurring/**, /api/recurring/**
+            - id: accounting-service-receipts
+              uri: lb://ACCOUNTING-SERVICE
+              predicates:
+                - Path=/api/v1/receipts/**, /api/receipts/**
+            - id: accounting-service-templates
+              uri: lb://ACCOUNTING-SERVICE
+              predicates:
+                - Path=/api/v1/templates/**, /api/templates/**
+            - id: accounting-service-system
+              uri: lb://ACCOUNTING-SERVICE
+              predicates:
+                - Path=/api/v1/meta/**, /api/meta/**, /api/v1/trash/**, /api/trash/**, /api/v1/trash-pdf, /api/trash-pdf, /api/v1/backups/**, /api/backups/**, /api/v1/export, /api/export, /api/v1/import, /api/import, /api/v1/version, /api/version, /api/v1/check-update, /api/check-update, /api/v1/save-pdf, /api/save-pdf
 
 eureka:
   client:
     serviceUrl:
-      defaultZone: http://localhost:8761/eureka/
+      defaultZone: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:http://localhost:8761/eureka/}

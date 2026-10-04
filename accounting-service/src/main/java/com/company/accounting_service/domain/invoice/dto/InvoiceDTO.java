@@ -1,13 +1,16 @@
 package com.company.accounting_service.domain.invoice.dto;
 
+import com.company.accounting_service.core.json.ExtensibleDTO;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 
 @Data
-public class InvoiceDTO {
+@EqualsAndHashCode(callSuper = false)
+public class InvoiceDTO extends ExtensibleDTO {
     private Long id;
     private String invoiceNumber;
     private String type;

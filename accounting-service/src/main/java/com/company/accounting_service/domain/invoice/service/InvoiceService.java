@@ -19,6 +19,8 @@ import java.util.stream.Collectors;
 import com.company.accounting_service.kafka.event.InventoryEvent;
 import com.company.accounting_service.kafka.producer.AccountingInventoryEventProducer;
 
+import com.company.accounting_service.core.tenant.TenantContext;
+
 @Service
 @RequiredArgsConstructor
 public class InvoiceService {
@@ -29,7 +31,7 @@ public class InvoiceService {
 
     @Transactional(readOnly = true)
     public List<InvoiceDTO> getAllInvoices() {
-        return invoiceRepository.findAll().stream()
+        return invoiceRepository.findActiveByTenant(TenantContext.getCurrentTenant()).stream()
                 .map(this::mapToDTO)
                 .collect(Collectors.toList());
     }
@@ -38,11 +40,12 @@ public class InvoiceService {
     public InvoiceDTO saveInvoice(InvoiceDTO dto) {
         Invoice invoice;
         if (dto.getId() != null) {
-            invoice = invoiceRepository.findById(dto.getId())
+            invoice = invoiceRepository.findByIdAndTenant(dto.getId(), TenantContext.getCurrentTenant())
                     .orElseThrow(() -> new RuntimeException("Invoice not found"));
             invoice.getItems().clear(); // For simplicity, we just rebuild the items
         } else {
             invoice = new Invoice();
+            invoice.setTenantId(TenantContext.getCurrentTenant());
         }
 
         invoice.setInvoiceNumber(dto.getInvoiceNumber());
@@ -59,6 +62,7 @@ public class InvoiceService {
         invoice.setStatus(dto.getStatus());
         invoice.setNotes(dto.getNotes());
         invoice.setTerms(dto.getTerms());
+        invoice.setExtraJson(com.company.accounting_service.core.json.ExtraJson.write(dto.extraFields()));
 
         try {
             if (dto.getOptions() != null) {
@@ -90,7 +94,7 @@ public class InvoiceService {
             InventoryEvent event = InventoryEvent.builder()
                     .transactionId("INVOICE_" + invoice.getId())
                     .eventType("DEDUCT_STOCK")
-                    .warehouseId(1L) // Assuming warehouseId = 1 for now
+                    .warehouseId(1L)
                     .items(invoice.getItems().stream().map(item -> 
                             InventoryEvent.StockItem.builder()
                                     .productId(item.getProductId() != null ? item.getProductId() : 1L)
@@ -106,7 +110,39 @@ public class InvoiceService {
 
     @Transactional
     public void deleteInvoice(Long id) {
-        invoiceRepository.deleteById(id);
+        invoiceRepository.findByIdAndTenant(id, TenantContext.getCurrentTenant()).ifPresent(invoice -> {
+            invoice.setIsDeleted(true);
+            invoice.setDeletedAt(java.time.LocalDateTime.now());
+            invoiceRepository.save(invoice);
+        });
+    }
+
+    @Transactional(readOnly = true)
+    public List<InvoiceDTO> getTrashedInvoices() {
+        return invoiceRepository.findTrashByTenant(TenantContext.getCurrentTenant()).stream()
+                .map(inv -> {
+                    InvoiceDTO dto = mapToDTO(inv);
+                    if (inv.getDeletedAt() != null) {
+                        dto.extraFields().put("_trashedAt", inv.getDeletedAt().toString());
+                    }
+                    return dto;
+                })
+                .collect(Collectors.toList());
+    }
+
+    @Transactional
+    public void restoreInvoice(Long id) {
+        invoiceRepository.findByIdAndTenant(id, TenantContext.getCurrentTenant()).ifPresent(invoice -> {
+            invoice.setIsDeleted(false);
+            invoice.setDeletedAt(null);
+            invoiceRepository.save(invoice);
+        });
+    }
+
+    @Transactional
+    public void purgeInvoice(Long id) {
+        invoiceRepository.findByIdAndTenant(id, TenantContext.getCurrentTenant())
+                .ifPresent(invoiceRepository::delete);
     }
 
     private InvoiceDTO mapToDTO(Invoice invoice) {
@@ -134,6 +170,8 @@ public class InvoiceService {
         } catch (JsonProcessingException e) {
             throw new RuntimeException("Failed to deserialize options JSON", e);
         }
+
+        dto.extraFields().putAll(com.company.accounting_service.core.json.ExtraJson.read(invoice.getExtraJson()));
 
         if (invoice.getItems() != null) {
             dto.setItems(invoice.getItems().stream().map(item -> {

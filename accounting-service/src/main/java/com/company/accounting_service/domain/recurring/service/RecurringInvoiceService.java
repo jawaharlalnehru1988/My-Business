@@ -44,6 +44,7 @@ public class RecurringInvoiceService {
         invoice.setNotes(dto.getNotes());
         invoice.setNextDate(dto.getNextDate());
         invoice.setActive(dto.getActive());
+        invoice.setExtraJson(com.company.accounting_service.core.json.ExtraJson.write(dto.extraFields()));
 
         if (dto.getItems() != null) {
             for (RecurringInvoiceDTO.RecurringInvoiceLineItemDTO itemDto : dto.getItems()) {
@@ -79,6 +80,7 @@ public class RecurringInvoiceService {
         dto.setNotes(invoice.getNotes());
         dto.setNextDate(invoice.getNextDate());
         dto.setActive(invoice.getActive());
+        dto.extraFields().putAll(com.company.accounting_service.core.json.ExtraJson.read(invoice.getExtraJson()));
 
         if (invoice.getItems() != null) {
             dto.setItems(invoice.getItems().stream().map(item -> {

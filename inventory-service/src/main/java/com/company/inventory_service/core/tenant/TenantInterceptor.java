@@ -14,12 +14,13 @@ public class TenantInterceptor implements HandlerInterceptor {
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
         String tenantIdHeader = request.getHeader(TENANT_HEADER);
-        if (tenantIdHeader != null && !tenantIdHeader.isEmpty()) {
+        if (tenantIdHeader != null && !tenantIdHeader.trim().isEmpty()) {
             try {
-                Long tenantId = Long.parseLong(tenantIdHeader);
+                Long tenantId = Long.parseLong(tenantIdHeader.trim());
                 TenantContext.setCurrentTenant(tenantId);
             } catch (NumberFormatException e) {
-                TenantContext.setCurrentTenant(1L);
+                long hash = Math.abs((long) tenantIdHeader.trim().hashCode());
+                TenantContext.setCurrentTenant(hash == 0 ? 1L : hash);
             }
         } else {
             TenantContext.setCurrentTenant(1L);

@@ -35,6 +35,7 @@ public class TermsTemplateService {
 
         template.setName(dto.getName());
         template.setContent(dto.getContent());
+        template.setExtraJson(com.company.accounting_service.core.json.ExtraJson.write(dto.extraFields()));
 
         template = termsTemplateRepository.save(template);
         return mapToDTO(template);
@@ -50,6 +51,7 @@ public class TermsTemplateService {
         dto.setId(template.getId());
         dto.setName(template.getName());
         dto.setContent(template.getContent());
+        dto.extraFields().putAll(com.company.accounting_service.core.json.ExtraJson.read(template.getExtraJson()));
         return dto;
     }
 }

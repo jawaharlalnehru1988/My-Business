@@ -1,11 +1,14 @@
 package com.company.accounting_service.domain.receipt.dto;
 
+import com.company.accounting_service.core.json.ExtensibleDTO;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
 @Data
-public class ReceiptDTO {
+@EqualsAndHashCode(callSuper = false)
+public class ReceiptDTO extends ExtensibleDTO {
     private Long id;
     private LocalDate date;
     private String receiptNo;

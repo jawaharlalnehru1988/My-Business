@@ -1,127 +1,57 @@
-// File-based storage via local Express API server
-// All data persists as JSON files in the ./data/ folder
+// Microservices API client
+// Connects through API Gateway to Spring Boot backend services and Postgres
+import { toast } from './components/Toast';
 
 const API = '/api';
 
 async function apiFetch(url, options = {}) {
   const token = localStorage.getItem('jwt_token');
-  const defaultHeaders = { 'Content-Type': 'application/json' };
+  const tenantId = localStorage.getItem('tenantId') || '1';
+  const defaultHeaders = { 
+    'Content-Type': 'application/json',
+    'X-Tenant-ID': String(tenantId)
+  };
   if (token) {
     defaultHeaders['Authorization'] = `Bearer ${token}`;
   }
-  
-  const isCollectionUrl = (u) => (
-    u.includes('/bills') || u.includes('/products') || u.includes('/clients') ||
-    u.includes('/expenses') || u.includes('/purchases') || u.includes('/receipts') ||
-    u.includes('/recurring') || u.includes('/templates') || u.includes('/profiles') ||
-    u.includes('/suppliers')
-  );
 
-  const saveToCollectionCache = (targetUrl, payload) => {
-    try {
-      const baseUrl = targetUrl.split('?')[0];
-      const cachedRaw = localStorage.getItem(`gst_cache_${baseUrl}`);
-      let list = [];
-      if (cachedRaw) {
-        try {
-          const parsed = JSON.parse(cachedRaw);
-          if (Array.isArray(parsed)) list = parsed;
-        } catch { /* ignore */ }
-      }
-      const item = typeof payload === 'string' ? JSON.parse(payload) : payload;
-      if (!item.id) item.id = Date.now();
-      const existingIdx = list.findIndex(x => x && x.id === item.id);
-      if (existingIdx >= 0) {
-        list[existingIdx] = { ...list[existingIdx], ...item };
-      } else {
-        list.push(item);
-      }
-      localStorage.setItem(`gst_cache_${baseUrl}`, JSON.stringify(list));
-      return item;
-    } catch { return typeof payload === 'string' ? JSON.parse(payload) : payload; }
-  };
-
+  let res;
   try {
-    const res = await fetch(url, {
+    res = await fetch(url, {
       ...options,
       headers: { ...defaultHeaders, ...(options.headers || {}) },
     });
-    if (res.ok) {
-      const data = await res.json().catch(() => ({}));
-      try {
-        if (!options.method || options.method === 'GET') {
-          localStorage.setItem(`gst_cache_${url}`, JSON.stringify(data));
-        } else if (options.method === 'POST' || options.method === 'PUT') {
-          if (isCollectionUrl(url)) {
-            saveToCollectionCache(url, data);
-          }
-        }
-      } catch { /* ignore */ }
-      return data;
+  } catch (netErr) {
+    const errorMsg = `Backend connection failed (${url}). Please ensure backend microservices & gateway are running.`;
+    console.error(errorMsg, netErr);
+    try { toast(errorMsg, 'error', 6000); } catch { /* ignore */ }
+    if (typeof window !== 'undefined' && window.dispatchEvent) {
+      window.dispatchEvent(new CustomEvent('api-error', { detail: { message: errorMsg, url } }));
     }
+    throw new Error(errorMsg);
+  }
 
-    // Fallback for 404 or server errors to prevent UI blocking
-    if (res.status === 404 || res.status === 500) {
-      if (!options.method || options.method === 'GET') {
-        const cached = localStorage.getItem(`gst_cache_${url}`);
-        if (cached) {
-          try {
-            const parsed = JSON.parse(cached);
-            if (isCollectionUrl(url)) return Array.isArray(parsed) ? parsed : [];
-            return parsed;
-          } catch { /* ignore */ }
-        }
-        if (isCollectionUrl(url)) return [];
-        return {};
-      } else {
-        if (options.body && (options.method === 'POST' || options.method === 'PUT')) {
-          if (isCollectionUrl(url)) {
-            return saveToCollectionCache(url, options.body);
-          } else {
-            try {
-              const parsed = JSON.parse(options.body);
-              localStorage.setItem(`gst_cache_${url}`, options.body);
-              return parsed;
-            } catch { /* ignore */ }
-          }
-        }
-        return { success: true };
-      }
-    }
-
+  if (!res.ok) {
     let body = null;
     try { body = await res.json(); } catch { /* non-JSON body */ }
-    const err = new Error(body?.error || `API error: ${res.status}`);
+    const errDetail = body?.error || body?.message || `HTTP ${res.status}: ${res.statusText}`;
+    const errorMsg = `Microservice request failed [${res.status}]: ${errDetail}`;
+    console.error(errorMsg, { url, status: res.status, body });
+    try { toast(errorMsg, 'error', 5000); } catch { /* ignore */ }
+    if (typeof window !== 'undefined' && window.dispatchEvent) {
+      window.dispatchEvent(new CustomEvent('api-error', { detail: { message: errorMsg, status: res.status, url } }));
+    }
+    const err = new Error(errorMsg);
     err.status = res.status;
     err.body = body;
     throw err;
-  } catch (err) {
-    if (!options.method || options.method === 'GET') {
-      const cached = localStorage.getItem(`gst_cache_${url}`);
-      if (cached) {
-        try {
-          const parsed = JSON.parse(cached);
-          if (isCollectionUrl(url)) return Array.isArray(parsed) ? parsed : [];
-          return parsed;
-        } catch { /* ignore */ }
-      }
-      if (isCollectionUrl(url)) return [];
-      return {};
-    } else {
-      if (options.body && (options.method === 'POST' || options.method === 'PUT')) {
-        if (isCollectionUrl(url)) {
-          return saveToCollectionCache(url, options.body);
-        } else {
-          try {
-            const parsed = JSON.parse(options.body);
-            localStorage.setItem(`gst_cache_${url}`, options.body);
-            return parsed;
-          } catch { /* ignore */ }
-        }
-      }
-      return { success: true };
-    }
   }
+
+  if (res.status === 204) {
+    return null;
+  }
+
+  return await res.json().catch(() => ({}));
 }
 
 // ---- Invoice Number Settings ----
@@ -269,11 +199,52 @@ export const getNextInvoiceNumber = async (prefix = 'INV', { peek = false, expli
 // message that the UI can show as "Invoice number already exists".
 export const saveBill = async (bill, { overwrite = false } = {}) => {
   const qs = overwrite ? '?overwrite=1' : '';
-  return apiFetch(`${API}/v1/bills${qs}`, { method: 'POST', body: JSON.stringify(bill) });
+  const payload = {
+    ...bill,
+    type: bill.invoiceType || bill.type || 'tax-invoice',
+    options: {
+      ...(bill.options || {}),
+      paidAmount: bill.paidAmount,
+      payments: bill.payments,
+      data: bill.data,
+      currency: bill.currency || 'INR',
+      invoiceType: bill.invoiceType || bill.type || 'tax-invoice'
+    }
+  };
+  return apiFetch(`${API}/v1/bills${qs}`, { method: 'POST', body: JSON.stringify(payload) });
 };
 
 export const getAllBills = async () => {
-  return apiFetch(`${API}/v1/bills`);
+  const bills = await apiFetch(`${API}/v1/bills`);
+  if (Array.isArray(bills)) {
+    return bills.map(b => {
+      const opts = b.options || {};
+      const invType = b.invoiceType || b.type || opts.invoiceType || 'tax-invoice';
+      const paid = b.paidAmount !== undefined && b.paidAmount !== null
+        ? Number(b.paidAmount)
+        : (opts.paidAmount !== undefined && opts.paidAmount !== null
+          ? Number(opts.paidAmount)
+          : (b.status === 'paid' ? Number(b.totalAmount || 0) : 0));
+      return {
+        ...opts,
+        ...b,
+        invoiceType: invType,
+        type: invType,
+        paidAmount: paid,
+        data: b.data || opts.data || {
+          items: b.items || [],
+          totals: {
+            subtotal: b.subtotal,
+            cgst: b.cgstAmount,
+            sgst: b.sgstAmount,
+            igst: b.igstAmount,
+            total: b.totalAmount
+          }
+        }
+      };
+    });
+  }
+  return bills;
 };
 
 export const deleteBill = async (id) => {

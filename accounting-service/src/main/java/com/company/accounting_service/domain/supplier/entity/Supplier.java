@@ -39,4 +39,10 @@ public class Supplier {
 
     @Column(name = "ifsc_code")
     private String ifscCode;
+
+    @Column(name = "extra_json", columnDefinition = "TEXT")
+    private String extraJson;
+
+    @Column(name = "tenant_id")
+    private Long tenantId;
 }

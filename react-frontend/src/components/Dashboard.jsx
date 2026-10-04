@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
-import { FileText, Trash2, Plus, IndianRupee, Receipt, Edit3, TrendingUp, Search, Copy, X, CheckCircle, Clock, AlertTriangle, MessageCircle, Mail, StickyNote, Send, Package, Download, Printer } from 'lucide-react';
+import { FileText, Trash2, Plus, IndianRupee, Receipt, Edit3, TrendingUp, Search, Copy, X, CheckCircle, Clock, AlertTriangle, MessageCircle, Mail, StickyNote, Send, Package, Download, Printer, ArrowDown, ArrowUp, ChevronRight, ChevronDown, ShoppingCart, CreditCard, Building2, BarChart2 } from 'lucide-react';
 import HelpButton from './HelpButton';
-import { getAllBills, deleteBill, saveBill, getAllProducts, saveProduct, getProfile, getAllClients, getStockAlertSettings, saveReceipt, deleteReceipt } from '../store';
+import { getAllBills, deleteBill, saveBill, getAllProducts, saveProduct, getProfile, getAllClients, getAllSuppliers, getAllPurchases, getAllExpenses, getStockAlertSettings, saveReceipt, deleteReceipt } from '../store';
 import { formatCurrency, INVOICE_TYPES, getFYOptions, numberToWords } from '../utils';
 import { openWhatsAppShare } from '../utils/share';
 import { toast } from './Toast';
@@ -142,7 +142,7 @@ function ReceiptModal({ target, onClose }) {
   );
 }
 
-export default function Dashboard({ onNew, onEdit, onDuplicate, onConvert, initialTypeFilter }) {
+export default function Dashboard({ onNew, onEdit, onDuplicate, onConvert, initialTypeFilter, onNavigate }) {
   const [bills, setBills] = useState([]);
   const [filtered, setFiltered] = useState([]);
   const [stats, setStats] = useState({ byCurrency: {}, count: 0 });
@@ -152,6 +152,14 @@ export default function Dashboard({ onNew, onEdit, onDuplicate, onConvert, initi
   const [fyFilter, setFyFilter] = useState('all');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
+
+  // Vyapar-Specific State
+  const [purchases, setPurchases] = useState([]);
+  const [expenses, setExpenses] = useState([]);
+  const [suppliers, setSuppliers] = useState([]);
+  const [chartPeriod, setChartPeriod] = useState('this-month');
+  const [hoverDataPoint, setHoverDataPoint] = useState(null);
+  const [showAllLowStock, setShowAllLowStock] = useState(false);
 
   useEffect(() => {
     if (initialTypeFilter) setTypeFilter(initialTypeFilter);
@@ -252,6 +260,9 @@ export default function Dashboard({ onNew, onEdit, onDuplicate, onConvert, initi
     loadBills();
     getProfile().then(p => setProfileState(p)).catch(() => {});
     getAllClients().then(c => setClients(c)).catch(() => {});
+    getAllSuppliers().then(s => setSuppliers(s || [])).catch(() => {});
+    getAllPurchases().then(pur => setPurchases(pur || [])).catch(() => {});
+    getAllExpenses().then(exp => setExpenses(exp || [])).catch(() => {});
     // Pull the stock-alert config alongside products so the Dashboard's
     // low-stock card honours the user's threshold + on/off preference.
     Promise.all([
@@ -269,6 +280,151 @@ export default function Dashboard({ onNew, onEdit, onDuplicate, onConvert, initi
       setLowStockProducts(prods.filter(p => p.type !== 'SERVICE' && (p.stock ?? 0) <= threshold));
     });
   }, []);
+
+  // Vyapar KPI: Total Receivable (Unpaid Invoices from Clients)
+  const receivableData = useMemo(() => {
+    let total = 0;
+    const clientMap = new Set();
+    bills.forEach(b => {
+      if (b.invoiceType !== 'proforma' && b.status !== 'paid') {
+        const remaining = (Number(b.totalAmount) || 0) - (Number(b.paidAmount) || 0);
+        if (remaining > 0) {
+          total += remaining;
+          if (b.clientName) clientMap.add(b.clientName);
+        }
+      }
+    });
+    return { total, count: clientMap.size };
+  }, [bills]);
+
+  // Vyapar KPI: Total Payable (Unpaid Purchases to Suppliers)
+  const payableData = useMemo(() => {
+    let total = 0;
+    const supplierMap = new Set();
+    purchases.forEach(p => {
+      if (p.status !== 'paid') {
+        const remaining = (Number(p.totalAmount) || 0) - (Number(p.paidAmount) || 0);
+        if (remaining > 0) {
+          total += remaining;
+          const sName = p.vendorName || p.supplierName || p.supplier;
+          if (sName) supplierMap.add(sName);
+        }
+      }
+    });
+    return { total, count: supplierMap.size };
+  }, [purchases]);
+
+  // Vyapar Right-Panel Financial Metrics (Purchases, Expenses, Cash, Bank)
+  const financialSnapshot = useMemo(() => {
+    const now = new Date();
+    const curYear = now.getFullYear();
+    const curMonth = now.getMonth();
+
+    const purchasesThisMonth = purchases
+      .filter(p => {
+        const dStr = p.purchaseDate || p.date;
+        if (!dStr) return false;
+        const d = new Date(dStr);
+        return d.getFullYear() === curYear && d.getMonth() === curMonth;
+      })
+      .reduce((sum, p) => sum + (Number(p.totalAmount) || 0), 0);
+
+    const expensesThisMonth = expenses
+      .filter(e => {
+        const dStr = e.date || e.expenseDate;
+        if (!dStr) return false;
+        const d = new Date(dStr);
+        return d.getFullYear() === curYear && d.getMonth() === curMonth;
+      })
+      .reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+
+    let cashInHand = 0;
+    let bankBalance = 0;
+
+    bills.forEach(b => {
+      if (b.data?.payments && Array.isArray(b.data.payments)) {
+        b.data.payments.forEach(pay => {
+          const amt = Number(pay.amount) || 0;
+          if (pay.mode === 'cash') cashInHand += amt;
+          else bankBalance += amt;
+        });
+      } else if (b.paidAmount) {
+        bankBalance += Number(b.paidAmount) || 0;
+      }
+    });
+
+    purchases.forEach(p => {
+      const paid = Number(p.paidAmount) || (p.status === 'paid' ? Number(p.totalAmount) || 0 : 0);
+      if (p.paymentMode === 'cash') cashInHand -= paid;
+      else bankBalance -= paid;
+    });
+
+    expenses.forEach(e => {
+      const amt = Number(e.amount) || 0;
+      if (e.paymentMode === 'cash') cashInHand -= amt;
+      else bankBalance -= amt;
+    });
+
+    return { purchasesThisMonth, expensesThisMonth, cashInHand, bankBalance };
+  }, [bills, purchases, expenses]);
+
+  // Vyapar Center-Panel Sales Trend Chart Data
+  const chartData = useMemo(() => {
+    const now = new Date();
+    const points = [];
+    let periodTotal = 0;
+
+    if (chartPeriod === 'this-month') {
+      const year = now.getFullYear();
+      const month = now.getMonth();
+      const daysInMonth = new Date(year, month + 1, 0).getDate();
+      for (let day = 1; day <= daysInMonth; day++) {
+        const dayStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        let dayTotal = 0;
+        bills.forEach(b => {
+          if (b.invoiceType === 'proforma') return;
+          if (b.invoiceDate === dayStr) {
+            dayTotal += Number(b.totalAmount) || 0;
+          }
+        });
+        periodTotal += dayTotal;
+        points.push({ label: `${day} ${now.toLocaleString('default', { month: 'short' })}`, day, value: dayTotal });
+      }
+    } else if (chartPeriod === 'last-30') {
+      for (let i = 29; i >= 0; i--) {
+        const d = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
+        const dayStr = d.toISOString().split('T')[0];
+        let dayTotal = 0;
+        bills.forEach(b => {
+          if (b.invoiceType === 'proforma') return;
+          if (b.invoiceDate === dayStr) {
+            dayTotal += Number(b.totalAmount) || 0;
+          }
+        });
+        periodTotal += dayTotal;
+        points.push({ label: `${d.getDate()} ${d.toLocaleString('default', { month: 'short' })}`, value: dayTotal });
+      }
+    } else {
+      // this-year
+      const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      for (let m = 0; m < 12; m++) {
+        let mTotal = 0;
+        bills.forEach(b => {
+          if (b.invoiceType === 'proforma') return;
+          if (!b.invoiceDate) return;
+          const d = new Date(b.invoiceDate);
+          if (d.getFullYear() === now.getFullYear() && d.getMonth() === m) {
+            mTotal += Number(b.totalAmount) || 0;
+          }
+        });
+        periodTotal += mTotal;
+        points.push({ label: monthNames[m], value: mTotal });
+      }
+    }
+
+    const maxValue = Math.max(...points.map(p => p.value), 1);
+    return { points, periodTotal, maxValue };
+  }, [bills, chartPeriod]);
 
   useEffect(() => {
     let result = bills;
@@ -945,25 +1101,34 @@ export default function Dashboard({ onNew, onEdit, onDuplicate, onConvert, initi
 
   return (
     <div className="dashboard-container">
-      <div className="page-header">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <div>
-            <h1 className="page-title">Dashboard</h1>
-            <p className="page-subtitle">Overview of your invoices</p>
-          </div>
+      {/* Vyapar Top Action Header */}
+      <div className="vyapar-dashboard-header">
+        <div className="vyapar-search-box">
+          <Search size={17} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+          <input
+            type="text"
+            placeholder="Search Transactions..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="vyapar-search-input"
+          />
+        </div>
+
+        <div className="vyapar-actions-group">
+          <button className="vyapar-btn-sale" onClick={() => onNew && onNew('tax-invoice')} title="Create New Sale Invoice">
+            <Plus size={16} /> Add Sale
+          </button>
+          <button className="vyapar-btn-purchase" onClick={() => onNavigate ? onNavigate('purchases') : null} title="Record Purchase Bill">
+            <Plus size={16} /> Add Purchase
+          </button>
           <HelpButton title="Dashboard — how to use">
             <ul style={{ paddingLeft: '1.1rem', margin: 0 }}>
-              <li><strong>New Invoice</strong> — start a fresh tax invoice / proforma / credit note / bill of supply / delivery challan.</li>
-              <li><strong>Filter row</strong> — search by client name, invoice #, or GSTIN; filter by type / status / financial year / date range.</li>
-              <li><strong>Row actions</strong> — Edit opens the invoice; MessageCircle sends via WhatsApp; Mail opens your email client; Record Payment logs a receipt; Trash soft-deletes for 30 days.</li>
-              <li><strong>WhatsApp share — mobile vs. desktop:</strong> on Android / iPhone the PDF attaches automatically via the OS share sheet (works with WhatsApp, Signal, Telegram, anywhere). On desktop, browsers block sending files to WhatsApp Web for security — we fall back to a text-only message with all invoice details. To send the PDF from desktop: click Download, then drag the file into WhatsApp Web.</li>
-              <li><strong>Bulk actions</strong> — select rows to export as one PDF or delete in a batch.</li>
-              <li><strong>Overdue banner</strong> — click it to jump to overdue invoices with one tap.</li>
-              <li><strong>Low-stock alert</strong> — appears when any product is at or below your threshold (Settings → Stock alert).</li>
+              <li><strong>Add Sale</strong> — start a fresh tax invoice / estimate / credit note.</li>
+              <li><strong>Add Purchase</strong> — log purchase bills from suppliers.</li>
+              <li><strong>Filter row</strong> — search by client name, invoice #, or GSTIN; filter by type / status / date range.</li>
             </ul>
           </HelpButton>
         </div>
-        <button className="btn btn-primary" onClick={onNew}><Plus size={18} /> New Invoice</button>
       </div>
 
       {overdueBills.length > 0 && (
@@ -1006,9 +1171,6 @@ export default function Dashboard({ onNew, onEdit, onDuplicate, onConvert, initi
                         <span className="font-medium">{bill.clientName}</span>
                         <span className="text-muted" style={{ marginLeft: 8, fontSize: '0.8rem' }}>{bill.invoiceNumber}</span>
                         {(() => {
-                          // v1.10.23 — signed outstanding label. Show
-                          // "Overpaid ₹1" in blue on the reminder card
-                          // instead of "-₹1" in red for overpayments.
                           const outCur = bill.currency || bill.data?.invoiceOptions?.currency;
                           const out = bill.totalAmount - (bill.paidAmount || 0);
                           if (out < -0.005) {
@@ -1038,102 +1200,195 @@ export default function Dashboard({ onNew, onEdit, onDuplicate, onConvert, initi
         </div>
       )}
 
-      <div className="stats-grid stats-grid-4">
-        <div className="stat-card">
-          <div className="stat-icon stat-icon-blue"><IndianRupee size={22} /></div>
-          <div style={{ flex: 1 }}>
-            <p className="stat-label">Total Invoiced</p>
-            {Object.entries(stats.byCurrency).map(([cur, v]) => (
-              <div key={cur} className="stat-value" style={{ fontSize: Object.keys(stats.byCurrency).length > 1 ? '1.1rem' : undefined }}>
-                {formatCurrency(v.total, cur)}
+      {/* Vyapar 2-Column Responsive Layout Grid */}
+      <div className="vyapar-layout-grid">
+        {/* Left Column: Metrics, Chart, Quick Reports, and Invoices Table */}
+        <div className="vyapar-main-col">
+          {/* Top 2 Vyapar KPI Cards */}
+          <div className="vyapar-kpi-row">
+            <div className="vyapar-kpi-card">
+              <div>
+                <div className="vyapar-kpi-title">Total Receivable</div>
+                <div className="vyapar-kpi-val">
+                  {formatCurrency(receivableData.total, profile?.currency || 'INR')}
+                </div>
+                <div className="vyapar-kpi-sub">
+                  From {receivableData.count} {receivableData.count === 1 ? 'Party' : 'Parties'}
+                </div>
               </div>
-            ))}
-            {Object.keys(stats.byCurrency).length === 0 && <h2 className="stat-value">—</h2>}
-          </div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-icon stat-icon-green"><TrendingUp size={22} /></div>
-          <div style={{ flex: 1 }}>
-            <p className="stat-label">Tax Collected</p>
-            {Object.entries(stats.byCurrency).map(([cur, v]) => (
-              <div key={cur} className="stat-value stat-value-green" style={{ fontSize: Object.keys(stats.byCurrency).length > 1 ? '1.1rem' : undefined }}>
-                {formatCurrency(v.tax, cur)}
+              <div className="vyapar-kpi-badge vyapar-badge-down">
+                <ArrowDown size={22} />
               </div>
-            ))}
-            {Object.keys(stats.byCurrency).length === 0 && <h2 className="stat-value stat-value-green">—</h2>}
-          </div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-icon stat-icon-amber"><Clock size={22} /></div>
-          <div style={{ flex: 1 }}>
-            <p className="stat-label">Outstanding</p>
-            {Object.entries(stats.byCurrency).map(([cur, v]) => (
-              <div key={cur} className="stat-value stat-value-amber" style={{ fontSize: Object.keys(stats.byCurrency).length > 1 ? '1.1rem' : undefined }}>
-                {formatCurrency(v.unpaid, cur)}
+            </div>
+
+            <div className="vyapar-kpi-card">
+              <div>
+                <div className="vyapar-kpi-title">Total Payable</div>
+                <div className="vyapar-kpi-val">
+                  {formatCurrency(payableData.total, profile?.currency || 'INR')}
+                </div>
+                <div className="vyapar-kpi-sub">
+                  From {payableData.count} {payableData.count === 1 ? 'Party' : 'Parties'}
+                </div>
               </div>
-            ))}
-            {Object.keys(stats.byCurrency).length === 0 && <h2 className="stat-value stat-value-amber">—</h2>}
+              <div className="vyapar-kpi-badge vyapar-badge-up">
+                <ArrowUp size={22} />
+              </div>
+            </div>
           </div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-icon stat-icon-purple"><Receipt size={22} /></div>
-          <div><p className="stat-label">Invoices</p><h2 className="stat-value stat-value-purple">{stats.count}</h2></div>
-        </div>
-      </div>
 
-      <h3 className="section-title" style={{ marginTop: '2rem', marginBottom: '1rem' }}>Inventory Overview</h3>
-      <div className="grid grid-cols-3 gap-6 mb-6">
-        {/* Inventory Valuation */}
-        <div className="stat-card" style={{ display: 'block' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
-            <div className="stat-icon stat-icon-blue"><Package size={22} /></div>
-            <p className="stat-label" style={{ margin: 0 }}>Total Valuation</p>
-          </div>
-          <div className="stat-value" style={{ fontSize: '1.5rem' }}>
-            {formatCurrency(inventoryValuation, profile?.currency || 'INR')}
-          </div>
-        </div>
+          {/* Vyapar Sales Trend Graph Card */}
+          <div className="vyapar-card">
+            <div className="vyapar-chart-header">
+              <div>
+                <div className="vyapar-chart-title">Total Sale</div>
+                <div className="vyapar-chart-val">
+                  {formatCurrency(chartData.periodTotal, profile?.currency || 'INR')}
+                </div>
+              </div>
+              <select
+                className="vyapar-period-select"
+                value={chartPeriod}
+                onChange={(e) => setChartPeriod(e.target.value)}
+              >
+                <option value="this-month">This Month</option>
+                <option value="last-30">Last 30 Days</option>
+                <option value="this-year">This Year</option>
+              </select>
+            </div>
 
-        {/* Top Selling Products */}
-        <div className="stat-card" style={{ display: 'block' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
-            <div className="stat-icon stat-icon-green"><TrendingUp size={22} /></div>
-            <p className="stat-label" style={{ margin: 0 }}>Top Selling (By Qty)</p>
-          </div>
-          {topProducts.length > 0 ? (
-            <ul style={{ listStyle: 'none', padding: 0, margin: 0, fontSize: '0.85rem' }}>
-              {topProducts.map((p, idx) => (
-                <li key={idx} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.2rem 0', borderBottom: idx < topProducts.length - 1 ? '1px solid #f1f5f9' : 'none' }}>
-                  <span style={{ color: '#475569' }}>{p.name}</span>
-                  <span style={{ fontWeight: 600 }}>{p.qty}</span>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="text-muted" style={{ fontSize: '0.85rem' }}>No sales data yet.</p>
-          )}
-        </div>
+            {/* Smooth SVG Line Chart */}
+            <div style={{ position: 'relative', width: '100%', height: 210 }}>
+              {(() => {
+                const W = 680;
+                const H = 200;
+                const padL = 40;
+                const padR = 20;
+                const padT = 20;
+                const padB = 30;
+                const plotW = W - padL - padR;
+                const plotH = H - padT - padB;
+                const maxVal = chartData.maxValue > 0 ? chartData.maxValue : 1;
+                const pts = chartData.points;
+                
+                const coords = pts.map((p, idx) => {
+                  const x = padL + (idx / Math.max(pts.length - 1, 1)) * plotW;
+                  const norm = p.value / maxVal;
+                  const y = padT + plotH - (norm * plotH);
+                  return { x, y, label: p.label, value: p.value };
+                });
 
-        {/* Low Stock Alerts */}
-        <div className="stat-card" style={{ display: 'block' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
-            <div className="stat-icon stat-icon-amber"><AlertTriangle size={22} /></div>
-            <p className="stat-label" style={{ margin: 0 }}>Low Stock Alerts</p>
+                let pathD = coords.length ? `M ${coords[0].x} ${coords[0].y}` : '';
+                for (let i = 0; i < coords.length - 1; i++) {
+                  const p0 = coords[i];
+                  const p1 = coords[i + 1];
+                  const cx = (p0.x + p1.x) / 2;
+                  pathD += ` C ${cx} ${p0.y}, ${cx} ${p1.y}, ${p1.x} ${p1.y}`;
+                }
+                const areaD = coords.length ? `${pathD} L ${coords[coords.length - 1].x} ${padT + plotH} L ${coords[0].x} ${padT + plotH} Z` : '';
+
+                const gridLevels = [0, 0.25, 0.5, 0.75, 1];
+
+                return (
+                  <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: '100%', overflow: 'visible' }}>
+                    <defs>
+                      <linearGradient id="vyaparChartGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.25" />
+                        <stop offset="100%" stopColor="#3b82f6" stopOpacity="0.0" />
+                      </linearGradient>
+                    </defs>
+
+                    {gridLevels.map((lvl, idx) => {
+                      const y = padT + plotH - lvl * plotH;
+                      const yVal = Math.round(lvl * maxVal);
+                      return (
+                        <g key={idx}>
+                          <line x1={padL} y1={y} x2={W - padR} y2={y} stroke="var(--border)" strokeDasharray="3 3" strokeWidth="1" />
+                          <text x={padL - 8} y={y + 4} textAnchor="end" fontSize="10" fill="var(--text-muted)">
+                            {yVal >= 1000 ? `${(yVal / 1000).toFixed(0)}k` : yVal}
+                          </text>
+                        </g>
+                      );
+                    })}
+
+                    {areaD && <path d={areaD} fill="url(#vyaparChartGrad)" />}
+                    {pathD && <path d={pathD} fill="none" stroke="#2563eb" strokeWidth="2.5" strokeLinecap="round" />}
+
+                    {coords.map((c, i) => (
+                      <circle
+                        key={i}
+                        cx={c.x}
+                        cy={c.y}
+                        r={hoverDataPoint?.index === i ? 5 : 2.5}
+                        fill="#2563eb"
+                        stroke="#ffffff"
+                        strokeWidth={hoverDataPoint?.index === i ? 2 : 1}
+                        style={{ cursor: 'pointer', transition: 'all 0.15s ease' }}
+                        onMouseEnter={() => setHoverDataPoint({ ...c, index: i })}
+                        onMouseLeave={() => setHoverDataPoint(null)}
+                      />
+                    ))}
+
+                    {coords.filter((_, i) => i % Math.max(1, Math.floor(coords.length / 7)) === 0 || i === coords.length - 1).map((c, i) => (
+                      <text key={i} x={c.x} y={H - 8} textAnchor="middle" fontSize="10" fill="var(--text-muted)">
+                        {c.label}
+                      </text>
+                    ))}
+                  </svg>
+                );
+              })()}
+
+              {hoverDataPoint && (
+                <div style={{
+                  position: 'absolute',
+                  left: `${(hoverDataPoint.x / 680) * 100}%`,
+                  top: `${(hoverDataPoint.y / 200) * 100}%`,
+                  transform: 'translate(-50%, -120%)',
+                  background: '#1e293b',
+                  color: '#ffffff',
+                  padding: '0.35rem 0.65rem',
+                  borderRadius: 6,
+                  fontSize: '0.75rem',
+                  fontWeight: 600,
+                  pointerEvents: 'none',
+                  whiteSpace: 'nowrap',
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                  zIndex: 10,
+                }}>
+                  <div>{hoverDataPoint.label}</div>
+                  <div style={{ color: '#60a5fa' }}>{formatCurrency(hoverDataPoint.value, profile?.currency || 'INR')}</div>
+                </div>
+              )}
+            </div>
           </div>
-          {lowStockProducts.length > 0 ? (
-            <ul style={{ listStyle: 'none', padding: 0, margin: 0, fontSize: '0.85rem', maxHeight: '100px', overflowY: 'auto' }}>
-              {lowStockProducts.map(p => (
-                <li key={p.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.2rem 0', borderBottom: '1px solid #f1f5f9' }}>
-                  <span style={{ color: '#475569' }}>{p.name}</span>
-                  <span style={{ fontWeight: 600, color: '#dc2626' }}>{p.stock || 0} left</span>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="text-muted" style={{ fontSize: '0.85rem' }}>All stock levels healthy.</p>
-          )}
-        </div>
-      </div>
+
+          {/* Most Used Reports Row */}
+          <div className="vyapar-card">
+            <div className="vyapar-reports-header">
+              <span className="vyapar-reports-title">Most Used Reports</span>
+              <button className="vyapar-reports-viewall" onClick={() => onNavigate ? onNavigate('reports') : null}>
+                View All <ChevronRight size={14} />
+              </button>
+            </div>
+            <div className="vyapar-reports-grid">
+              <div className="vyapar-report-tile" onClick={() => onNavigate ? onNavigate('reports') : null}>
+                <span>Sale Report</span>
+                <ChevronRight size={16} style={{ color: '#2563eb' }} />
+              </div>
+              <div className="vyapar-report-tile" onClick={() => onNavigate ? onNavigate('reports') : null}>
+                <span>All Transactions</span>
+                <ChevronRight size={16} style={{ color: '#2563eb' }} />
+              </div>
+              <div className="vyapar-report-tile" onClick={() => onNavigate ? onNavigate('reports') : null}>
+                <span>Daybook Report</span>
+                <ChevronRight size={16} style={{ color: '#2563eb' }} />
+              </div>
+              <div className="vyapar-report-tile" onClick={() => onNavigate ? onNavigate('clients') : null}>
+                <span>Party Statement</span>
+                <ChevronRight size={16} style={{ color: '#2563eb' }} />
+              </div>
+            </div>
+          </div>
 
 
       <div className="glass-panel">
@@ -1273,7 +1528,7 @@ export default function Dashboard({ onNew, onEdit, onDuplicate, onConvert, initi
           <div className="empty-state">
             <FileText size={48} />
             <p>{bills.length === 0 ? 'No invoices yet.' : 'No invoices match your filters.'}</p>
-            {bills.length === 0 && <button className="btn btn-primary" onClick={onNew}><Plus size={18} /> Create Invoice</button>}
+            {bills.length === 0 && <button className="btn btn-primary" onClick={() => onNew && onNew('tax-invoice')}><Plus size={18} /> Create Invoice</button>}
           </div>
         ) : (
           <div className="table-scroll">
@@ -1380,6 +1635,117 @@ export default function Dashboard({ onNew, onEdit, onDuplicate, onConvert, initi
             </table>
           </div>
         )}
+      </div>
+      </div>
+
+      {/* Right Column: Vyapar Financial Summary & Widgets */}
+      <div className="vyapar-side-col">
+        <div className="vyapar-side-card">
+          {/* Purchases */}
+          <div className="vyapar-side-metric-item" onClick={() => onNavigate ? onNavigate('purchases') : null} style={{ cursor: onNavigate ? 'pointer' : 'default' }}>
+            <div className="vyapar-side-metric-row">
+              <span className="vyapar-side-metric-label">Purchases</span>
+              <span className="vyapar-side-metric-tag">(This Month)</span>
+            </div>
+            <div className="vyapar-side-metric-val">
+              {formatCurrency(financialSnapshot.purchasesThisMonth, profile?.currency || 'INR')}
+            </div>
+          </div>
+
+          {/* Expenses */}
+          <div className="vyapar-side-metric-item" onClick={() => onNavigate ? onNavigate('expenses') : null} style={{ cursor: onNavigate ? 'pointer' : 'default' }}>
+            <div className="vyapar-side-metric-row">
+              <span className="vyapar-side-metric-label">Expenses</span>
+              <span className="vyapar-side-metric-tag">(This Month)</span>
+            </div>
+            <div className="vyapar-side-metric-val">
+              {formatCurrency(financialSnapshot.expensesThisMonth, profile?.currency || 'INR')}
+            </div>
+          </div>
+
+          {/* Stock Value */}
+          <div className="vyapar-side-metric-item" onClick={() => onNavigate ? onNavigate('products') : null} style={{ cursor: onNavigate ? 'pointer' : 'default' }}>
+            <div className="vyapar-side-metric-row">
+              <span className="vyapar-side-metric-label">Stock Value</span>
+              <span className="vyapar-side-metric-tag">(As of Now)</span>
+            </div>
+            <div className="vyapar-side-metric-val">
+              {formatCurrency(inventoryValuation, profile?.currency || 'INR')}
+            </div>
+          </div>
+
+          {/* Cash In Hand */}
+          <div className="vyapar-side-metric-item">
+            <div className="vyapar-side-metric-row">
+              <span className="vyapar-side-metric-label">Cash In Hand</span>
+              <span className="vyapar-side-metric-tag">(As of Now)</span>
+            </div>
+            <div className="vyapar-side-metric-val">
+              {formatCurrency(financialSnapshot.cashInHand, profile?.currency || 'INR')}
+            </div>
+          </div>
+
+          {/* Total Bank Balance */}
+          <div className="vyapar-side-metric-item" onClick={() => onNavigate ? onNavigate('banking') : null} style={{ cursor: onNavigate ? 'pointer' : 'default' }}>
+            <div className="vyapar-side-metric-row">
+              <span className="vyapar-side-metric-label">Total Bank Balance</span>
+              <span className="vyapar-side-metric-tag">(As of Now)</span>
+            </div>
+            <div className="vyapar-side-metric-val">
+              {formatCurrency(financialSnapshot.bankBalance, profile?.currency || 'INR')}
+            </div>
+          </div>
+
+          {/* Low Stocks Items */}
+          <div className="vyapar-side-metric-item" style={{ borderBottom: 'none' }}>
+            <div className="vyapar-side-metric-row">
+              <span className="vyapar-side-metric-label">Low Stocks Items</span>
+              <span className="vyapar-side-metric-tag" style={{ color: lowStockProducts.length > 0 ? '#ef4444' : undefined, fontWeight: 600 }}>
+                ({lowStockProducts.length} Items)
+              </span>
+            </div>
+            {lowStockProducts.length > 0 ? (
+              <div style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                {(showAllLowStock ? lowStockProducts : lowStockProducts.slice(0, 3)).map((item, idx) => (
+                  <div key={item.id || idx} className="vyapar-low-stock-item">
+                    <span style={{ textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', maxWidth: '180px' }}>{item.name}</span>
+                    <span style={{ fontWeight: 600, color: '#ef4444' }}>{Number(item.stock || 0).toFixed(2)} {item.unit || 'PCS'}</span>
+                  </div>
+                ))}
+                {lowStockProducts.length > 3 && (
+                  <button
+                    type="button"
+                    onClick={() => setShowAllLowStock(v => !v)}
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      color: '#2563eb',
+                      fontSize: '0.78rem',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      padding: '0.25rem 0',
+                      textAlign: 'left',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 4
+                    }}
+                  >
+                    {showAllLowStock ? 'See Less ∧' : `See More (${lowStockProducts.length - 3}) ∨`}
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>No low stock alerts</div>
+            )}
+          </div>
+        </div>
+
+        {/* Add Widget Button */}
+        <button className="vyapar-add-widget-btn" onClick={() => toast('Custom widgets configurable in settings', 'info')}>
+          <span>+ Add Widget of Your Choice</span>
+          <ChevronRight size={14} />
+        </button>
+      </div>
       </div>
 
       {/* Payment Modal */}

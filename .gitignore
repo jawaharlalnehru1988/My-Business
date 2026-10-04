@@ -5,3 +5,12 @@ target/
 .vscode/
 node_modules/
 dist/
+
+# Runtime, logs, and local backups
+logs/
+backups/
+accounting-service/backups/
+*.log
+*.tmp
+.env
+.env.local

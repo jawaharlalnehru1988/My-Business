@@ -54,4 +54,10 @@ public class BusinessProfile {
 
     @Column(name = "payment_accounts_json", columnDefinition = "TEXT")
     private String paymentAccountsJson;
+
+    @Column(name = "extra_json", columnDefinition = "TEXT")
+    private String extraJson;
+
+    @Column(name = "tenant_id")
+    private Long tenantId;
 }
