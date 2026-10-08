@@ -12,10 +12,10 @@ import java.util.Optional;
 @Repository
 public interface ReceiptRepository extends JpaRepository<Receipt, Long> {
 
-    @Query("SELECT r FROM Receipt r WHERE (r.tenantId = :tenantId OR (r.tenantId IS NULL AND :tenantId = 1))")
+    @Query("SELECT r FROM Receipt r WHERE r.tenantId = :tenantId")
     List<Receipt> findByTenant(@Param("tenantId") Long tenantId);
 
-    @Query("SELECT r FROM Receipt r WHERE r.id = :id AND (r.tenantId = :tenantId OR (r.tenantId IS NULL AND :tenantId = 1))")
+    @Query("SELECT r FROM Receipt r WHERE r.id = :id AND r.tenantId = :tenantId")
     Optional<Receipt> findByIdAndTenant(@Param("id") Long id, @Param("tenantId") Long tenantId);
 }
 

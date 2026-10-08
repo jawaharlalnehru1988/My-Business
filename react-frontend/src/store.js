@@ -6,11 +6,13 @@ const API = '/api';
 
 async function apiFetch(url, options = {}) {
   const token = localStorage.getItem('jwt_token');
-  const tenantId = localStorage.getItem('tenantId') || '1';
+  const tenantId = localStorage.getItem('tenantId');
   const defaultHeaders = { 
-    'Content-Type': 'application/json',
-    'X-Tenant-ID': String(tenantId)
+    'Content-Type': 'application/json'
   };
+  if (tenantId && tenantId !== 'null' && tenantId !== 'undefined' && String(tenantId).trim() !== '') {
+    defaultHeaders['X-Tenant-ID'] = String(tenantId).trim();
+  }
   if (token) {
     defaultHeaders['Authorization'] = `Bearer ${token}`;
   }
@@ -264,17 +266,25 @@ export const purgeTrashedBill = async (id) => apiFetch(`${API}/trash/${encodeURI
 
 // ---- Profile ----
 export const saveProfile = async (profile) => {
-  try { localStorage.setItem('freegstbill_profile', JSON.stringify(profile)); } catch { /* ignore */ }
+  const tenantId = localStorage.getItem('tenantId');
+  if (tenantId && tenantId !== 'null' && tenantId !== 'undefined') {
+    try { localStorage.setItem(`freegstbill_profile_${tenantId}`, JSON.stringify(profile)); } catch { /* ignore */ }
+  }
   const res = await apiFetch(`${API}/v1/profile`, { method: 'POST', body: JSON.stringify(profile) });
   window.dispatchEvent(new Event('fgsb-profile-updated'));
   return res;
 };
 
 export const getProfile = async () => {
-  const cached = localStorage.getItem('freegstbill_profile');
+  const tenantId = localStorage.getItem('tenantId');
+  if (!tenantId || tenantId === 'null' || tenantId === 'undefined') {
+    return {};
+  }
+  const cacheKey = `freegstbill_profile_${tenantId}`;
+  const cached = localStorage.getItem(cacheKey);
   const res = await apiFetch(`${API}/v1/profile`).catch(() => null);
   if (res && typeof res === 'object' && Object.keys(res).length > 0 && res.businessName) {
-    try { localStorage.setItem('freegstbill_profile', JSON.stringify(res)); } catch { /* ignore */ }
+    try { localStorage.setItem(cacheKey, JSON.stringify(res)); } catch { /* ignore */ }
     return res;
   }
   if (cached) {
@@ -582,3 +592,57 @@ export const importData = async (jsonString, selection) => {
 
   return result;
 };
+
+// ---- Collaborator & Partner Invitation APIs ----
+export const getReceivedInvitations = async () => {
+  return apiFetch(`${API}/v1/auth/invitations/received`).catch(() => []);
+};
+
+export const acceptInvitation = async (id) => {
+  return apiFetch(`${API}/v1/auth/invitations/${encodeURIComponent(id)}/accept`, { method: 'POST' });
+};
+
+export const rejectInvitation = async (id) => {
+  return apiFetch(`${API}/v1/auth/invitations/${encodeURIComponent(id)}/reject`, { method: 'POST' });
+};
+
+export const sendInvitation = async (email, role = 'ACCOUNTING_PARTNER') => {
+  return apiFetch(`${API}/v1/auth/invitations`, {
+    method: 'POST',
+    body: JSON.stringify({ email, role })
+  });
+};
+
+export const getSentInvitations = async () => {
+  return apiFetch(`${API}/v1/auth/invitations/sent`).catch(() => []);
+};
+
+export const revokeInvitation = async (id) => {
+  return apiFetch(`${API}/v1/auth/invitations/${encodeURIComponent(id)}`, { method: 'DELETE' });
+};
+
+export const getCollaborators = async () => {
+  return apiFetch(`${API}/v1/auth/collaborators`).catch(() => []);
+};
+
+export const removeCollaborator = async (id) => {
+  return apiFetch(`${API}/v1/auth/collaborators/${encodeURIComponent(id)}`, { method: 'DELETE' });
+};
+
+export const getMyWorkspaces = async () => {
+  return apiFetch(`${API}/v1/auth/workspaces`).catch(() => []);
+};
+
+export const switchWorkspace = async (targetTenantId) => {
+  const res = await apiFetch(`${API}/v1/auth/workspaces/switch/${encodeURIComponent(targetTenantId)}`, { method: 'POST' });
+  if (res && res.token) {
+    localStorage.setItem('jwt_token', res.token);
+    localStorage.setItem('tenantId', String(res.tenantId));
+    if (res.businessName) {
+      localStorage.setItem('businessName', res.businessName);
+      localStorage.setItem(`freegstbill_profile_${res.tenantId}`, JSON.stringify({ businessName: res.businessName, tenantId: res.tenantId }));
+    }
+  }
+  return res;
+};
+

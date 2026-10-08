@@ -337,7 +337,7 @@ export default function SaleInvoicesView({ docType = 'tax-invoice', onNew, onEdi
     const docNo = bill.invoiceNumber || 'DOC';
     const docDate = bill.invoiceDate || bill.data?.details?.invoiceDate || 'Today';
     const total = Number(bill.totalAmount || bill.data?.totals?.total || bill.amount || 0);
-    const busName = profile?.businessName || 'Sri Raani Dry Fruits Traders';
+    const busName = profile?.businessName || localStorage.getItem('businessName') || 'My Business';
 
     let msg = `Dear *${partyName}*,\n\n`;
 

@@ -991,7 +991,7 @@ export default function BarcodeGeneratorView() {
                     className="form-input"
                     value={header}
                     onChange={e => setHeader(e.target.value)}
-                    placeholder="e.g. Sri Raani Dry Fruits Traders"
+                    placeholder="e.g. Acme Enterprises"
                   />
                 </div>
 

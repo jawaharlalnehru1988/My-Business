@@ -12,10 +12,10 @@ import java.util.Optional;
 @Repository
 public interface ExpenseRepository extends JpaRepository<Expense, Long> {
 
-    @Query("SELECT e FROM Expense e WHERE (e.tenantId = :tenantId OR (e.tenantId IS NULL AND :tenantId = 1))")
+    @Query("SELECT e FROM Expense e WHERE e.tenantId = :tenantId")
     List<Expense> findByTenant(@Param("tenantId") Long tenantId);
 
-    @Query("SELECT e FROM Expense e WHERE e.id = :id AND (e.tenantId = :tenantId OR (e.tenantId IS NULL AND :tenantId = 1))")
+    @Query("SELECT e FROM Expense e WHERE e.id = :id AND e.tenantId = :tenantId")
     Optional<Expense> findByIdAndTenant(@Param("id") Long id, @Param("tenantId") Long tenantId);
 }
 

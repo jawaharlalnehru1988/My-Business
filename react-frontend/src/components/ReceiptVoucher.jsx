@@ -662,7 +662,7 @@ export default function ReceiptVoucher({ autoOpenNew }) {
       doc.setFontSize(16); doc.setFont('helvetica', 'bold');
       doc.text('DAILY DAYBOOK STATEMENT', marginL, y); y += 6;
       doc.setFontSize(9); doc.setFont('helvetica', 'normal'); doc.setTextColor(100);
-      doc.text(profile?.businessName || 'Sri Raani Dry Fruits Traders', marginL, y); y += 4.5;
+      doc.text(profile?.businessName || localStorage.getItem('businessName') || 'My Business', marginL, y); y += 4.5;
       if (profile?.gstin) { doc.text(`GSTIN: ${profile.gstin}`, marginL, y); y += 4.5; }
       doc.setTextColor(0);
 

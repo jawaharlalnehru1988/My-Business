@@ -12,10 +12,10 @@ import java.util.Optional;
 @Repository
 public interface ClientRepository extends JpaRepository<Client, Long> {
 
-    @Query("SELECT c FROM Client c WHERE (c.tenantId = :tenantId OR (c.tenantId IS NULL AND :tenantId = 1))")
+    @Query("SELECT c FROM Client c WHERE c.tenantId = :tenantId")
     List<Client> findByTenant(@Param("tenantId") Long tenantId);
 
-    @Query("SELECT c FROM Client c WHERE c.id = :id AND (c.tenantId = :tenantId OR (c.tenantId IS NULL AND :tenantId = 1))")
+    @Query("SELECT c FROM Client c WHERE c.id = :id AND c.tenantId = :tenantId")
     Optional<Client> findByIdAndTenant(@Param("id") Long id, @Param("tenantId") Long tenantId);
 }
 

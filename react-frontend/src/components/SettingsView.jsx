@@ -2,13 +2,14 @@ import { useState, useEffect, useRef } from 'react';
 import { getProfile, saveProfile, exportAllData, importData, inspectBackup, getTermsTemplates, saveTermsTemplate, deleteTermsTemplate, getAllProfiles, saveBusinessProfile, deleteBusinessProfile, getInvoiceNumberSettings, saveInvoiceNumberSettings, getRegionMode, setRegionMode, getEnabledModules, setEnabledModules, getStockAlertSettings, saveStockAlertSettings } from '../store';
 import { ensureToken, findOrCreateFolder, uploadJSON } from '../services/googleDrive';
 import { getCountryConfig, getStatesForCountry, validateTaxId, detectCountryFromBrowser, getCountriesForRegion, FEATURE_GROUPS, isModuleEnabled, getPaymentAccounts, createEmptyAccount, maskAccountNumber, reorderAccounts, setDefaultAccount, isValidUpiId } from '../utils';
-import { Save, Upload, Download, Plus, Trash2, Edit3, Image, PenTool, Cloud, CloudOff, Building2, Hash, RefreshCw, Save as SaveIcon } from 'lucide-react';
+import { Save, Upload, Download, Plus, Trash2, Edit3, Image, PenTool, Cloud, CloudOff, Building2, Hash, RefreshCw, Save as SaveIcon, Users, UserPlus } from 'lucide-react';
 import { initGoogleDrive, isConnected, disconnect } from '../services/googleDrive';
 import { toast } from './Toast';
 import { confirmAction } from './ConfirmModal';
 import PrintSettings from './PrintSettings';
 import BackupRestoreHub from './BackupRestoreHub';
 import HelpButton from './HelpButton';
+import PartnerManagementModal from './PartnerManagementModal';
 import { getBackupsList, restoreBackup, triggerBackup, deleteBackup, getTrashedBills, restoreTrashedBill, purgeTrashedBill } from '../store';
 
 export default function SettingsView({ onSaved }) {
@@ -33,6 +34,7 @@ export default function SettingsView({ onSaved }) {
   const [enabledModules, setEnabledModulesState] = useState(getEnabledModules());
   const [stockAlerts, setStockAlerts] = useState({ enabled: true, threshold: 5 });
   const [stockAlertsSaving, setStockAlertsSaving] = useState(false);
+  const [showPartnerModal, setShowPartnerModal] = useState(false);
 
   const toggleModule = (moduleId) => {
     const next = { ...enabledModules, [moduleId]: !isModuleEnabled(moduleId, enabledModules) };
@@ -1231,6 +1233,40 @@ export default function SettingsView({ onSaved }) {
         )}
       </div>
 
+      {/* ---- Accounting Partners & Collaboration ---- */}
+      <div className="glass-panel p-6 mb-6">
+        <div className="flex justify-between items-center mb-4" style={{ flexWrap: 'wrap', gap: '0.75rem' }}>
+          <div>
+            <h3 className="section-title" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Users size={20} style={{ color: '#059669' }} />
+              Accounting Partners & Collaboration
+            </h3>
+            <p className="page-subtitle" style={{ marginTop: '0.25rem', marginBottom: 0 }}>
+              Invite an external CA, accountant, or business partner to collaborate on your books securely.
+            </p>
+          </div>
+          <button
+            type="button"
+            className="btn btn-primary"
+            style={{ background: '#059669', borderColor: '#059669', display: 'flex', alignItems: 'center', gap: '6px' }}
+            onClick={() => setShowPartnerModal(true)}
+          >
+            <UserPlus size={16} /> Manage Partners & Invites
+          </button>
+        </div>
+        <div className="notice notice-info" style={{ margin: 0 }}>
+          <span className="notice-icon">🤝</span>
+          <div style={{ fontSize: '0.82rem', lineHeight: 1.5 }}>
+            <strong>Multi-Tenant Isolation & Role Sharing:</strong>
+            <ul style={{ margin: '0.25rem 0 0 1.2rem', padding: 0 }}>
+              <li>Each user has their own completely isolated workspace and unique tenant ID.</li>
+              <li>When you invite an accounting partner by email, they receive an invitation in their portal.</li>
+              <li>Upon accepting, your workspace appears in their workspace switcher without exposing other businesses.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
       {/* ---- Data Management ---- */}
       <div className="glass-panel p-6 mb-6">
         <h3 className="section-title">App Updates</h3>
@@ -1571,6 +1607,12 @@ function BackupAndTrashPanel() {
           </div>
         </div>
       </div>
+
+      <PartnerManagementModal
+        isOpen={showPartnerModal}
+        onClose={() => setShowPartnerModal(false)}
+        currentProfile={profile}
+      />
     </div>
   );
 }

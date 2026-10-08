@@ -41,10 +41,29 @@ public class JwtUtil {
         return extractExpiration(token).before(new Date());
     }
 
+    public Long extractTenantId(String token) {
+        Object tid = extractClaim(token, claims -> claims.get("tenantId"));
+        if (tid == null) return null;
+        if (tid instanceof Number) return ((Number) tid).longValue();
+        try {
+            return Long.parseLong(tid.toString());
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
     public String generateToken(CustomUserDetails userDetails) {
         Map<String, Object> claims = new HashMap<>();
         claims.put("role", userDetails.getAuthorities().iterator().next().getAuthority());
         claims.put("tenantId", userDetails.getTenantId());
+        
+        return createToken(claims, userDetails.getUsername());
+    }
+
+    public String generateTokenForTenant(CustomUserDetails userDetails, Long tenantId) {
+        Map<String, Object> claims = new HashMap<>();
+        claims.put("role", userDetails.getAuthorities().iterator().next().getAuthority());
+        claims.put("tenantId", tenantId);
         
         return createToken(claims, userDetails.getUsername());
     }

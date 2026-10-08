@@ -12,13 +12,13 @@ import java.util.Optional;
 @Repository
 public interface InvoiceRepository extends JpaRepository<Invoice, Long> {
     
-    @Query("SELECT i FROM Invoice i WHERE (i.tenantId = :tenantId OR (i.tenantId IS NULL AND :tenantId = 1)) AND (i.isDeleted = false OR i.isDeleted IS NULL)")
+    @Query("SELECT i FROM Invoice i WHERE i.tenantId = :tenantId AND (i.isDeleted = false OR i.isDeleted IS NULL)")
     List<Invoice> findActiveByTenant(@Param("tenantId") Long tenantId);
 
-    @Query("SELECT i FROM Invoice i WHERE (i.tenantId = :tenantId OR (i.tenantId IS NULL AND :tenantId = 1)) AND i.isDeleted = true")
+    @Query("SELECT i FROM Invoice i WHERE i.tenantId = :tenantId AND i.isDeleted = true")
     List<Invoice> findTrashByTenant(@Param("tenantId") Long tenantId);
 
-    @Query("SELECT i FROM Invoice i WHERE i.id = :id AND (i.tenantId = :tenantId OR (i.tenantId IS NULL AND :tenantId = 1))")
+    @Query("SELECT i FROM Invoice i WHERE i.id = :id AND i.tenantId = :tenantId")
     Optional<Invoice> findByIdAndTenant(@Param("id") Long id, @Param("tenantId") Long tenantId);
 
     Optional<Invoice> findByInvoiceNumber(String invoiceNumber);

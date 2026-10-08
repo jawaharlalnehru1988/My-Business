@@ -411,7 +411,7 @@ export default function CompanySwitcherModal({
                 <input
                   type="text"
                   required
-                  placeholder="e.g. Sri Raani Agro Traders"
+                  placeholder="e.g. Acme Agro Traders"
                   value={form.businessName}
                   onChange={e => setForm(prev => ({ ...prev, businessName: e.target.value }))}
                   className="form-input"

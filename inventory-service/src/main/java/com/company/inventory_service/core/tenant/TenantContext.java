@@ -8,7 +8,7 @@ public class TenantContext {
     }
 
     public static Long getCurrentTenant() {
-        return currentTenant.get() != null ? currentTenant.get() : 1L; // Fallback to 1L if none specified
+        return currentTenant.get();
     }
 
     public static void clear() {

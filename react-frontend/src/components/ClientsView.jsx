@@ -332,7 +332,7 @@ export default function ClientsView({ onEdit, onDuplicate, onNew }) {
     const savedClient = clients.find(c => c.name.toLowerCase() === partyName.toLowerCase());
     const stats = getClientStats(partyName);
     const cBills = getClientBills(partyName).filter(b => b.status !== 'paid');
-    const businessName = profile?.businessName || 'Sri Raani Dry Fruits Traders';
+    const businessName = profile?.businessName || localStorage.getItem('businessName') || 'My Business';
     const upiId = profile?.upiId || profile?.paymentAccounts?.[0]?.upiId || '';
 
     const invoiceLines = cBills.slice(0, 5).map(b => {
@@ -481,7 +481,7 @@ export default function ClientsView({ onEdit, onDuplicate, onNew }) {
       doc.setFontSize(16); doc.setFont('helvetica', 'bold');
       doc.text('STATEMENT OF ACCOUNT', marginL, y); y += 6;
       doc.setFontSize(9); doc.setFont('helvetica', 'normal'); doc.setTextColor(100);
-      doc.text(profile?.businessName || 'Sri Raani Dry Fruits Traders', marginL, y); y += 4.5;
+      doc.text(profile?.businessName || localStorage.getItem('businessName') || 'My Business', marginL, y); y += 4.5;
       if (profile?.address) { doc.text(profile.address, marginL, y); y += 4.5; }
       if (profile?.gstin) { doc.text(`GSTIN: ${profile.gstin}`, marginL, y); y += 4.5; }
       doc.setTextColor(0);
@@ -590,7 +590,7 @@ export default function ClientsView({ onEdit, onDuplicate, onNew }) {
       doc.setFontSize(18); doc.setFont('helvetica', 'bold');
       doc.text('AGING REPORT', marginL, y); y += 8;
       doc.setFontSize(10); doc.setFont('helvetica', 'normal'); doc.setTextColor(100);
-      doc.text(profile?.businessName || 'Sri Raani Dry Fruits Traders', marginL, y); y += 5;
+      doc.text(profile?.businessName || localStorage.getItem('businessName') || 'My Business', marginL, y); y += 5;
       doc.setTextColor(0);
       doc.text(`As of: ${new Date().toLocaleDateString('en-IN')}`, marginR, 20, { align: 'right' });
       doc.setFont('helvetica', 'bold');

@@ -6,7 +6,9 @@ import com.company.auth.domain.auth.dto.AuthRequest;
 import com.company.auth.domain.auth.dto.AuthResponse;
 import com.company.auth.domain.auth.dto.RegisterRequest;
 import com.company.auth.domain.auth.entity.Role;
+import com.company.auth.domain.auth.entity.TenantMember;
 import com.company.auth.domain.auth.entity.User;
+import com.company.auth.domain.auth.repository.TenantMemberRepository;
 import com.company.auth.domain.auth.repository.UserRepository;
 import lombok.*;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -16,11 +18,16 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
 
+import java.time.LocalDateTime;
+import java.util.Optional;
+import java.util.UUID;
+
 @Service
 @RequiredArgsConstructor
 public class AuthService {
 
     private final UserRepository userRepository;
+    private final TenantMemberRepository memberRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
     private final AuthenticationManager authenticationManager;
@@ -38,51 +45,61 @@ public class AuthService {
         private String contactInfo;
     }
 
+    private Long generateUniqueTenantId() {
+        return Math.abs(UUID.randomUUID().getMostSignificantBits() % 900000000000L) + 100000000000L;
+    }
+
     @Transactional
     public AuthResponse register(RegisterRequest request) {
-        if (userRepository.findByEmail(request.getEmail()).isPresent()) {
+        if (userRepository.findByEmail(request.getEmail().toLowerCase().trim()).isPresent()) {
             throw new RuntimeException("Email already registered.");
         }
 
-        // 1. Create Business (Tenant) in the backend service
+        String businessName = request.getBusinessName() != null && !request.getBusinessName().trim().isEmpty() 
+                ? request.getBusinessName().trim() 
+                : "My Business";
+
+        Long newTenantId = generateUniqueTenantId();
+
         TenantDto tenantRequest = TenantDto.builder()
-                .businessName(request.getBusinessName())
+                .businessName(businessName)
                 .gstNumber(request.getGstNumber())
                 .contactInfo(request.getContactInfo())
                 .address(request.getAddress())
                 .build();
 
-        TenantDto savedTenant = null;
         try {
-            savedTenant = restTemplate.postForObject(
+            TenantDto saved = restTemplate.postForObject(
                     "http://monolith-backend/api/v1/tenants",
                     tenantRequest,
                     TenantDto.class
             );
-        } catch (Exception e) {
-            savedTenant = TenantDto.builder()
-                    .id(System.currentTimeMillis())
-                    .businessName(request.getBusinessName() != null ? request.getBusinessName() : "My Business")
-                    .build();
+            if (saved != null && saved.getId() != null) {
+                newTenantId = saved.getId();
+            }
+        } catch (Exception ignored) {
+            // Standalone or microservices without monolith-backend
         }
 
-        if (savedTenant == null || savedTenant.getId() == null) {
-            savedTenant = TenantDto.builder()
-                    .id(System.currentTimeMillis())
-                    .businessName(request.getBusinessName() != null ? request.getBusinessName() : "My Business")
-                    .build();
-        }
-
-        // 2. Create User
+        // Create User
         User user = User.builder()
-                .email(request.getEmail())
+                .email(request.getEmail().toLowerCase().trim())
                 .password(passwordEncoder.encode(request.getPassword()))
                 .role(Role.ROLE_TENANT_OWNER)
-                .tenantId(savedTenant.getId())
+                .tenantId(newTenantId)
                 .build();
         User savedUser = userRepository.save(user);
 
-        // 3. Generate Token
+        // Record Owner in TenantMember
+        memberRepository.save(TenantMember.builder()
+                .tenantId(newTenantId)
+                .userEmail(savedUser.getEmail())
+                .role("OWNER")
+                .businessName(businessName)
+                .createdAt(LocalDateTime.now())
+                .build());
+
+        // Generate Token
         CustomUserDetails userDetails = new CustomUserDetails(savedUser);
         String jwtToken = jwtUtil.generateToken(userDetails);
 
@@ -90,36 +107,56 @@ public class AuthService {
                 .token(jwtToken)
                 .role(savedUser.getRole().name())
                 .tenantId(savedUser.getTenantId())
-                .businessName(savedTenant.getBusinessName())
+                .businessName(businessName)
                 .build();
     }
 
     public AuthResponse login(AuthRequest request) {
         authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword())
+                new UsernamePasswordAuthenticationToken(request.getEmail().toLowerCase().trim(), request.getPassword())
         );
 
-        User user = userRepository.findByEmail(request.getEmail())
+        User user = userRepository.findByEmail(request.getEmail().toLowerCase().trim())
                 .orElseThrow(() -> new RuntimeException("User not found"));
+
+        if (user.getTenantId() == null) {
+            Long newTenantId = generateUniqueTenantId();
+            user.setTenantId(newTenantId);
+            user = userRepository.save(user);
+        }
 
         CustomUserDetails userDetails = new CustomUserDetails(user);
         String jwtToken = jwtUtil.generateToken(userDetails);
 
         String businessName = null;
-        if (user.getTenantId() != null) {
-            try {
-                TenantDto tenant = restTemplate.getForObject(
-                        "http://monolith-backend/api/v1/tenants/" + user.getTenantId(),
-                        TenantDto.class
-                );
-                if (tenant != null) {
-                    businessName = tenant.getBusinessName();
-                }
-            } catch (Exception e) {
-                businessName = "Unknown Business (Error fetching)";
+        try {
+            TenantDto tenant = restTemplate.getForObject(
+                    "http://monolith-backend/api/v1/tenants/" + user.getTenantId(),
+                    TenantDto.class
+            );
+            if (tenant != null) {
+                businessName = tenant.getBusinessName();
             }
-        } else if (user.getRole() == Role.ROLE_SUPER_ADMIN) {
-            businessName = "Super Admin Console";
+        } catch (Exception ignored) {}
+
+        if (businessName == null) {
+            businessName = memberRepository.findByTenantId(user.getTenantId()).stream()
+                    .filter(m -> m.getBusinessName() != null && !m.getBusinessName().isEmpty())
+                    .map(TenantMember::getBusinessName)
+                    .findFirst()
+                    .orElse("My Business");
+        }
+
+        // Ensure owner membership exists
+        Optional<TenantMember> optMem = memberRepository.findByTenantIdAndUserEmailIgnoreCase(user.getTenantId(), user.getEmail());
+        if (optMem.isEmpty()) {
+            memberRepository.save(TenantMember.builder()
+                    .tenantId(user.getTenantId())
+                    .userEmail(user.getEmail())
+                    .role("OWNER")
+                    .businessName(businessName)
+                    .createdAt(LocalDateTime.now())
+                    .build());
         }
 
         return AuthResponse.builder()
@@ -142,37 +179,73 @@ public class AuthService {
             com.google.api.client.googleapis.auth.oauth2.GoogleIdToken idToken = verifier.verify(request.getCredential());
             if (idToken != null) {
                 com.google.api.client.googleapis.auth.oauth2.GoogleIdToken.Payload payload = idToken.getPayload();
-                String email = payload.getEmail();
+                String email = payload.getEmail().toLowerCase().trim();
 
                 User user = userRepository.findByEmail(email).orElse(null);
+                String businessName = null;
+
                 if (user == null) {
-                    // Auto-register without tenant for Setup Wizard
+                    // Brand new user: Always provision a dedicated, isolated tenant!
+                    Long newTenantId = generateUniqueTenantId();
+
+                    // Derive friendly business name
+                    if (payload.get("name") != null && !payload.get("name").toString().trim().isEmpty()) {
+                        businessName = payload.get("name").toString().trim() + "'s Business";
+                    } else if (email.contains("@")) {
+                        String prefix = email.split("@")[0];
+                        businessName = Character.toUpperCase(prefix.charAt(0)) + prefix.substring(1) + "'s Business";
+                    } else {
+                        businessName = "My Business";
+                    }
+
                     user = User.builder()
                             .email(email)
-                            .password(passwordEncoder.encode(java.util.UUID.randomUUID().toString()))
+                            .password(passwordEncoder.encode(UUID.randomUUID().toString()))
                             .role(Role.ROLE_TENANT_OWNER)
-                            .tenantId(null) // indicates setup wizard needed
+                            .tenantId(newTenantId)
                             .build();
                     user = userRepository.save(user);
+
+                    memberRepository.save(TenantMember.builder()
+                            .tenantId(newTenantId)
+                            .userEmail(email)
+                            .role("OWNER")
+                            .businessName(businessName)
+                            .createdAt(LocalDateTime.now())
+                            .build());
+                } else {
+                    // Existing user
+                    if (user.getTenantId() == null) {
+                        Long newTenantId = generateUniqueTenantId();
+                        user.setTenantId(newTenantId);
+                        user = userRepository.save(user);
+                    }
+
+                    businessName = memberRepository.findByTenantId(user.getTenantId()).stream()
+                            .filter(m -> m.getBusinessName() != null && !m.getBusinessName().isEmpty())
+                            .map(TenantMember::getBusinessName)
+                            .findFirst()
+                            .orElse(null);
+
+                    if (businessName == null) {
+                        businessName = "My Business";
+                    }
+
+                    // Ensure owner membership exists
+                    Optional<TenantMember> optMem = memberRepository.findByTenantIdAndUserEmailIgnoreCase(user.getTenantId(), email);
+                    if (optMem.isEmpty()) {
+                        memberRepository.save(TenantMember.builder()
+                                .tenantId(user.getTenantId())
+                                .userEmail(email)
+                                .role("OWNER")
+                                .businessName(businessName)
+                                .createdAt(LocalDateTime.now())
+                                .build());
+                    }
                 }
 
                 CustomUserDetails userDetails = new CustomUserDetails(user);
                 String jwtToken = jwtUtil.generateToken(userDetails);
-
-                String businessName = null;
-                if (user.getTenantId() != null) {
-                    try {
-                        TenantDto tenant = restTemplate.getForObject(
-                                "http://monolith-backend/api/v1/tenants/" + user.getTenantId(),
-                                TenantDto.class
-                        );
-                        if (tenant != null) {
-                            businessName = tenant.getBusinessName();
-                        }
-                    } catch (Exception e) {
-                        businessName = "Unknown Business (Error fetching)";
-                    }
-                }
 
                 return AuthResponse.builder()
                         .token(jwtToken)
@@ -192,43 +265,36 @@ public class AuthService {
 
     @Transactional
     public AuthResponse setupTenant(RegisterRequest request, String email) {
-        User user = userRepository.findByEmail(email)
+        String cleanEmail = email.toLowerCase().trim();
+        User user = userRepository.findByEmail(cleanEmail)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
-        if (user.getTenantId() != null) {
-            throw new RuntimeException("Tenant already setup");
+        String busName = request.getBusinessName() != null && !request.getBusinessName().trim().isEmpty() 
+                ? request.getBusinessName().trim() 
+                : "My Business";
+
+        Long tenantId = user.getTenantId();
+        if (tenantId == null) {
+            tenantId = generateUniqueTenantId();
+            user.setTenantId(tenantId);
+            userRepository.save(user);
         }
 
-        TenantDto tenantRequest = TenantDto.builder()
-                .businessName(request.getBusinessName() != null ? request.getBusinessName() : "My Business")
-                .gstNumber(request.getGstNumber())
-                .contactInfo(request.getContactInfo())
-                .address(request.getAddress())
-                .build();
-
-        TenantDto savedTenant = null;
-        try {
-            savedTenant = restTemplate.postForObject(
-                    "http://monolith-backend/api/v1/tenants",
-                    tenantRequest,
-                    TenantDto.class
-            );
-        } catch (Exception e) {
-            savedTenant = TenantDto.builder()
-                    .id(System.currentTimeMillis())
-                    .businessName(tenantRequest.getBusinessName())
-                    .build();
+        // Upsert TenantMember record
+        Optional<TenantMember> optMem = memberRepository.findByTenantIdAndUserEmailIgnoreCase(tenantId, cleanEmail);
+        if (optMem.isPresent()) {
+            TenantMember m = optMem.get();
+            m.setBusinessName(busName);
+            memberRepository.save(m);
+        } else {
+            memberRepository.save(TenantMember.builder()
+                    .tenantId(tenantId)
+                    .userEmail(cleanEmail)
+                    .role("OWNER")
+                    .businessName(busName)
+                    .createdAt(LocalDateTime.now())
+                    .build());
         }
-
-        if (savedTenant == null || savedTenant.getId() == null) {
-            savedTenant = TenantDto.builder()
-                    .id(System.currentTimeMillis())
-                    .businessName(tenantRequest.getBusinessName())
-                    .build();
-        }
-
-        user.setTenantId(savedTenant.getId());
-        userRepository.save(user);
 
         CustomUserDetails userDetails = new CustomUserDetails(user);
         String jwtToken = jwtUtil.generateToken(userDetails);
@@ -237,7 +303,7 @@ public class AuthService {
                 .token(jwtToken)
                 .role(user.getRole().name())
                 .tenantId(user.getTenantId())
-                .businessName(savedTenant.getBusinessName())
+                .businessName(busName)
                 .build();
     }
 }

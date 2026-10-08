@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo, lazy, Suspense } from 'react';
 import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { Home, FileText, Settings, Plus, Users, Package, BarChart3, Wallet, RefreshCw, Receipt, BookOpen, Moon, Sun, Download, X, ShoppingCart, ChevronDown, ChevronUp, Building2, Pencil, HelpCircle, Search, Command, Bell, Calculator, User, LogOut, Barcode, Percent, Database } from 'lucide-react';
-import { getAllProfiles, saveProfile, getEnabledModules, getAllBills, getAllProducts, getStockAlertSettings, getAllClients, getProfile } from './store';
+import { getAllProfiles, saveProfile, getEnabledModules, getAllBills, getAllProducts, getStockAlertSettings, getAllClients, getProfile, getMyWorkspaces, switchWorkspace } from './store';
 import { isModuleEnabled, getUpcomingFilings } from './utils';
 // v1.10.4 — Route-level lazy loading. Prior App.jsx synchronously
 // imported all 12 views (~15k LOC combined), so a first-paint on
@@ -25,6 +25,8 @@ import ToastContainer from './components/Toast';
 import ConfirmModalContainer from './components/ConfirmModal';
 import Onboarding from './components/Onboarding';
 import CompanySwitcherModal from './components/CompanySwitcherModal';
+import PartnerManagementModal from './components/PartnerManagementModal';
+import InvitationBanner from './components/InvitationBanner';
 const SettingsView = lazy(() => import('./components/SettingsView'));
 const ClientsView = lazy(() => import('./components/ClientsView'));
 const SuppliersView = lazy(() => import('./components/SuppliersView'));
@@ -112,6 +114,8 @@ function App() {
   const [showCompanyModal, setShowCompanyModal] = useState(false);
   const [updateInfo, setUpdateInfo] = useState(null);
   const [showUpdateModal, setShowUpdateModal] = useState(false);
+  const [showPartnerModal, setShowPartnerModal] = useState(false);
+  const [myWorkspaces, setMyWorkspaces] = useState([]);
 
   const deferredPrompt = useRef(null);
   const retryTimer = useRef(null);
@@ -124,6 +128,11 @@ function App() {
   const handleLogout = () => {
     localStorage.removeItem('jwt_token');
     localStorage.removeItem('user_email');
+    localStorage.removeItem('tenantId');
+    localStorage.removeItem('businessName');
+    localStorage.removeItem('freegstbill_profile');
+    sessionStorage.clear();
+    setProfile(null);
     setIsAuthenticated(false);
   };
 
@@ -158,6 +167,7 @@ function App() {
       if (!tid || tid === 'null' || tid === '') {
         setShowBusinessWizard(true);
       }
+      getMyWorkspaces().then(ws => setMyWorkspaces(Array.isArray(ws) ? ws : [])).catch(() => {});
     }
   }, [isAuthenticated]);
 
@@ -405,7 +415,7 @@ function App() {
 
   const handleSwitchProfile = async (bp) => {
     setShowProfileMenu(false);
-    const newTenant = bp.id || bp.tenantId || (bp.businessName ? Math.abs(bp.businessName.split('').reduce((a,b)=>{a=((a<<5)-a)+b.charCodeAt(0);return a&a},0)) : 1);
+    const newTenant = bp.tenantId || bp.id || (bp.businessName ? Math.abs(bp.businessName.split('').reduce((a,b)=>{a=((a<<5)-a)+b.charCodeAt(0);return a&a},0)) : (localStorage.getItem('tenantId') || ''));
     localStorage.setItem('tenantId', String(newTenant));
     const loaded = { ...bp };
     delete loaded.id;
@@ -867,7 +877,7 @@ function App() {
           </div>
           <div>
             <h2 className="sidebar-title" style={{ fontSize: '0.98rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '170px' }}>
-              {profile?.businessName || 'Sri Raani Dry Fruits'}
+              {profile?.businessName || localStorage.getItem('businessName') || 'My Business'}
             </h2>
             <p className="sidebar-subtitle">{profile?.gstin || 'Vyapar Edition'}</p>
           </div>
@@ -877,13 +887,13 @@ function App() {
           <div className="profile-switcher-row">
             <button
               className="profile-switcher-btn"
-              onClick={() => allProfiles.length > 1 && setShowProfileMenu(v => !v)}
-              title={allProfiles.length > 1 ? 'Switch business profile' : profile?.businessName || 'My Business'}
-              style={{ cursor: allProfiles.length > 1 ? 'pointer' : 'default' }}
+              onClick={() => (allProfiles.length > 1 || myWorkspaces.length > 0) && setShowProfileMenu(v => !v)}
+              title={(allProfiles.length > 1 || myWorkspaces.length > 0) ? 'Switch business profile or workspace' : profile?.businessName || 'My Business'}
+              style={{ cursor: (allProfiles.length > 1 || myWorkspaces.length > 0) ? 'pointer' : 'default' }}
             >
               <Building2 size={14} />
               <span className="profile-switcher-name">{profile?.businessName || 'My Business'}</span>
-              {allProfiles.length > 1 && <ChevronDown size={13} style={{ marginLeft: 'auto', opacity: 0.6 }} />}
+              {(allProfiles.length > 1 || myWorkspaces.length > 0) && <ChevronDown size={13} style={{ marginLeft: 'auto', opacity: 0.6 }} />}
             </button>
             <button
               className="profile-switcher-edit"
@@ -895,7 +905,40 @@ function App() {
           </div>
           {showProfileMenu && (
             <div className="profile-switcher-menu">
-              {allProfiles.map(bp => (
+              {myWorkspaces.length > 0 && (
+                <div style={{ padding: '4px 8px', fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  Workspaces
+                </div>
+              )}
+              {myWorkspaces.map(ws => (
+                <button
+                  key={ws.tenantId}
+                  className={`profile-switcher-item${String(ws.tenantId) === String(localStorage.getItem('tenantId')) ? ' active' : ''}`}
+                  onClick={async () => {
+                    setShowProfileMenu(false);
+                    if (String(ws.tenantId) !== String(localStorage.getItem('tenantId'))) {
+                      await switchWorkspace(ws.tenantId);
+                      window.location.reload();
+                    }
+                  }}
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}
+                >
+                  <span style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ws.businessName}</span>
+                  <span style={{
+                    fontSize: '0.65rem',
+                    padding: '2px 6px',
+                    borderRadius: 4,
+                    fontWeight: 600,
+                    flexShrink: 0,
+                    background: ws.role === 'OWNER' ? 'rgba(37,99,235,0.1)' : 'rgba(16,185,129,0.1)',
+                    color: ws.role === 'OWNER' ? 'var(--primary, #2563eb)' : '#10b981'
+                  }}>
+                    {ws.role === 'OWNER' ? 'Owner' : 'Partner'}
+                  </span>
+                </button>
+              ))}
+
+              {allProfiles.length > 1 && myWorkspaces.length === 0 && allProfiles.map(bp => (
                 <button
                   key={bp.id || bp.businessName}
                   className={`profile-switcher-item${bp.businessName?.trim().toLowerCase() === profile?.businessName?.trim().toLowerCase() ? ' active' : ''}`}
@@ -904,6 +947,18 @@ function App() {
                   {bp.businessName}
                 </button>
               ))}
+
+              <div style={{ borderTop: '1px solid var(--border-color, rgba(0,0,0,0.1))', margin: '4px 0' }} />
+
+              <button
+                className="profile-switcher-item"
+                style={{ color: '#059669', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}
+                onClick={() => { setShowProfileMenu(false); setShowPartnerModal(true); }}
+              >
+                <Users size={13} />
+                <span>Accounting Partners & Invites...</span>
+              </button>
+
               <button
                 className="profile-switcher-item profile-switcher-manage"
                 onClick={() => { setShowProfileMenu(false); setCurrentView('settings'); }}
@@ -1376,13 +1431,38 @@ function App() {
               <ChevronDown size={14} style={{ opacity: 0.7, marginLeft: '2px', color: 'var(--primary, #2563eb)' }} />
             </button>
 
+            {/* Accounting Partners Button */}
+            <button
+              type="button"
+              onClick={() => setShowPartnerModal(true)}
+              className="navbar-partner-btn"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                fontSize: '0.82rem',
+                fontWeight: 600,
+                padding: '0.35rem 0.85rem',
+                borderRadius: '20px',
+                border: '1.5px solid rgba(16, 185, 129, 0.35)',
+                background: 'rgba(16, 185, 129, 0.08)',
+                color: '#059669',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease'
+              }}
+              title="Manage Accounting Partners & Collaborations"
+            >
+              <Users size={15} />
+              <span>Partners</span>
+            </button>
+
             {/* Logged-In User Profile Chip */}
-            <div className="navbar-user-chip" title={`Logged in as ${localStorage.getItem('user_email') || 'jawaharlalnehru@gmail.com'}`}>
+            <div className="navbar-user-chip" title={`Logged in as ${localStorage.getItem('user_email') || 'user@example.com'}`}>
               <div className="user-avatar">
                 <User size={15} />
               </div>
               <div className="user-info">
-                <span className="user-email">{localStorage.getItem('user_email') || 'jawaharlalnehru@gmail.com'}</span>
+                <span className="user-email">{localStorage.getItem('user_email') || 'user@example.com'}</span>
                 <span className="user-role">Administrator</span>
               </div>
             </div>
@@ -1394,6 +1474,10 @@ function App() {
             </button>
           </div>
         </header>
+
+        <div style={{ padding: '0 1.5rem', marginTop: '0.75rem' }}>
+          <InvitationBanner onAccepted={() => getMyWorkspaces().then(setMyWorkspaces)} />
+        </div>
 
         {currentView === 'dashboard' && (
           <Dashboard onNew={handleNewInvoice} onEdit={handleEditInvoice} onDuplicate={handleDuplicateInvoice} onConvert={handleConvertToInvoice} initialTypeFilter={dashboardTypeFilter} onNavigate={setCurrentView} />
@@ -1686,6 +1770,26 @@ function App() {
           </div>
         </div>
       )}
+
+      {/* Multi-Company Switcher Modal */}
+      <CompanySwitcherModal
+        isOpen={showCompanyModal}
+        onClose={() => setShowCompanyModal(false)}
+        profile={profile}
+        allProfiles={allProfiles}
+        onSwitchProfile={handleSwitchProfile}
+        onProfileCreated={(newP) => {
+          setAllProfiles(prev => [...prev, newP]);
+          handleSwitchProfile(newP);
+        }}
+      />
+
+      {/* Accounting Partner Management Modal */}
+      <PartnerManagementModal
+        isOpen={showPartnerModal}
+        onClose={() => setShowPartnerModal(false)}
+        currentProfile={profile}
+      />
     </div>
   );
 

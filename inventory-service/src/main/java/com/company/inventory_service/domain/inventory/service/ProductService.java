@@ -27,13 +27,17 @@ public class ProductService {
 
     @Transactional
     public ProductDTO saveProduct(ProductDTO dto) {
+        Long tenantId = TenantContext.getCurrentTenant();
+        if (tenantId == null) {
+            throw new IllegalStateException("Active tenant context is required to save product.");
+        }
         Product product;
         if (dto.getId() != null) {
-            product = productRepository.findByIdAndTenant(dto.getId(), TenantContext.getCurrentTenant())
+            product = productRepository.findByIdAndTenant(dto.getId(), tenantId)
                     .orElseThrow(() -> new RuntimeException("Product not found"));
         } else {
             product = new Product();
-            product.setTenantId(TenantContext.getCurrentTenant());
+            product.setTenantId(tenantId);
         }
 
         product.setName(dto.getName());

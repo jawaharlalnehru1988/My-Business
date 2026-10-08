@@ -31,9 +31,20 @@ export default function Login({ onLoginSuccess }) {
         throw new Error(errMsg);
       }
       const data = await res.json();
+      localStorage.removeItem('freegstbill_profile');
+      sessionStorage.clear();
       localStorage.setItem('jwt_token', data.token);
-      localStorage.setItem('tenantId', data.tenantId || '');
-      localStorage.setItem('businessName', data.businessName || '');
+      if (data.tenantId) {
+        localStorage.setItem('tenantId', String(data.tenantId));
+      } else {
+        localStorage.removeItem('tenantId');
+      }
+      if (data.businessName) {
+        localStorage.setItem('businessName', data.businessName);
+        if (data.tenantId) {
+          localStorage.setItem(`freegstbill_profile_${data.tenantId}`, JSON.stringify({ businessName: data.businessName, tenantId: data.tenantId }));
+        }
+      }
       toast('Signed in with Google successfully!', 'success');
       onLoginSuccess();
     } catch (err) {
@@ -69,17 +80,21 @@ export default function Login({ onLoginSuccess }) {
 
       const data = await res.json();
       if (data.token) {
+        localStorage.removeItem('freegstbill_profile');
+        sessionStorage.clear();
         localStorage.setItem('jwt_token', data.token);
-        localStorage.setItem('user_email', username || data.username || 'jawaharlalnehru@gmail.com');
-        if (data.tenantId) localStorage.setItem('tenantId', data.tenantId);
-        if (data.businessName) localStorage.setItem('businessName', data.businessName);
+        localStorage.setItem('user_email', username || data.username || 'user@example.com');
+        if (data.tenantId) {
+          localStorage.setItem('tenantId', String(data.tenantId));
+        } else {
+          localStorage.removeItem('tenantId');
+        }
         if (data.businessName) {
-          try {
-            const p = JSON.parse(localStorage.getItem('freegstbill_profile') || '{}');
-            p.businessName = data.businessName;
-            localStorage.setItem('freegstbill_profile', JSON.stringify(p));
-            window.dispatchEvent(new Event('fgsb-profile-updated'));
-          } catch { /* ignore */ }
+          localStorage.setItem('businessName', data.businessName);
+          if (data.tenantId) {
+            localStorage.setItem(`freegstbill_profile_${data.tenantId}`, JSON.stringify({ businessName: data.businessName, tenantId: data.tenantId }));
+          }
+          window.dispatchEvent(new Event('fgsb-profile-updated'));
         }
         toast('Logged in successfully', 'success');
         onLoginSuccess();

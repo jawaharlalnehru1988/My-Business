@@ -39,17 +39,21 @@ public class BusinessProfileService {
 
     @Transactional
     public BusinessProfileDTO saveProfile(BusinessProfileDTO dto) {
+        Long tenantId = TenantContext.getCurrentTenant();
+        if (tenantId == null) {
+            throw new IllegalStateException("Active tenant context is required to save business profile.");
+        }
         BusinessProfile profile;
         if (dto.getId() != null) {
-            profile = profileRepository.findByIdAndTenant(dto.getId(), TenantContext.getCurrentTenant())
+            profile = profileRepository.findByIdAndTenant(dto.getId(), tenantId)
                     .orElseThrow(() -> new RuntimeException("Profile not found"));
         } else {
-            List<BusinessProfile> all = profileRepository.findByTenant(TenantContext.getCurrentTenant());
+            List<BusinessProfile> all = profileRepository.findByTenant(tenantId);
             if (!all.isEmpty()) {
                 profile = all.get(0);
             } else {
                 profile = new BusinessProfile();
-                profile.setTenantId(TenantContext.getCurrentTenant());
+                profile.setTenantId(tenantId);
             }
         }
 
@@ -87,13 +91,17 @@ public class BusinessProfileService {
 
     @Transactional
     public BusinessProfileDTO saveSpecificProfile(BusinessProfileDTO dto) {
+        Long tenantId = TenantContext.getCurrentTenant();
+        if (tenantId == null) {
+            throw new IllegalStateException("Active tenant context is required to save business profile.");
+        }
         BusinessProfile profile;
         if (dto.getId() != null) {
-            profile = profileRepository.findByIdAndTenant(dto.getId(), TenantContext.getCurrentTenant())
+            profile = profileRepository.findByIdAndTenant(dto.getId(), tenantId)
                     .orElseThrow(() -> new RuntimeException("Profile not found"));
         } else {
             profile = new BusinessProfile();
-            profile.setTenantId(TenantContext.getCurrentTenant());
+            profile.setTenantId(tenantId);
         }
 
         // Duplicated logic for saving specific profile (handles multi-business)
