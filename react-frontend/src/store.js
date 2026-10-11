@@ -4,7 +4,7 @@ import { toast } from './components/Toast';
 
 const API = '/api';
 
-async function apiFetch(url, options = {}) {
+async function apiFetch(url, options = {}, retries = 2) {
   const token = localStorage.getItem('jwt_token');
   const tenantId = localStorage.getItem('tenantId');
   const defaultHeaders = { 
@@ -24,6 +24,10 @@ async function apiFetch(url, options = {}) {
       headers: { ...defaultHeaders, ...(options.headers || {}) },
     });
   } catch (netErr) {
+    if (retries > 0) {
+      await new Promise(r => setTimeout(r, 350));
+      return apiFetch(url, options, retries - 1);
+    }
     const errorMsg = `Backend connection failed (${url}). Please ensure backend microservices & gateway are running.`;
     console.error(errorMsg, netErr);
     try { toast(errorMsg, 'error', 6000); } catch { /* ignore */ }
@@ -34,6 +38,11 @@ async function apiFetch(url, options = {}) {
   }
 
   if (!res.ok) {
+    const method = (options.method || 'GET').toUpperCase();
+    if ((res.status >= 500 && res.status <= 504) && retries > 0 && method === 'GET') {
+      await new Promise(r => setTimeout(r, 450));
+      return apiFetch(url, options, retries - 1);
+    }
     let body = null;
     try { body = await res.json(); } catch { /* non-JSON body */ }
     const errDetail = body?.error || body?.message || `HTTP ${res.status}: ${res.statusText}`;
