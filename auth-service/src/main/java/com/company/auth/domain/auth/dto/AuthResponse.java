@@ -14,4 +14,5 @@ public class AuthResponse {
     private String role;
     private Long tenantId;
     private String businessName; // Useful for the frontend
+    private String email;
 }

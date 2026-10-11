@@ -17,6 +17,21 @@ export default function Login({ onLoginSuccess }) {
     setLoading(true);
     setError('');
     try {
+      let googleEmail = '';
+      if (credentialResponse?.credential) {
+        try {
+          const parts = credentialResponse.credential.split('.');
+          if (parts.length > 1) {
+            const googlePayload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+            if (googlePayload?.email) {
+              googleEmail = googlePayload.email.toLowerCase().trim();
+            }
+          }
+        } catch (e) {
+          console.warn('Could not extract email from google credential:', e);
+        }
+      }
+
       const res = await fetch('/api/v1/auth/google', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -34,6 +49,18 @@ export default function Login({ onLoginSuccess }) {
       localStorage.removeItem('freegstbill_profile');
       sessionStorage.clear();
       localStorage.setItem('jwt_token', data.token);
+
+      let emailToStore = data.email || data.username || googleEmail;
+      if (!emailToStore && data.token) {
+        try {
+          const tokenPayload = JSON.parse(atob(data.token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+          emailToStore = tokenPayload.sub || tokenPayload.email;
+        } catch (e) {}
+      }
+      if (emailToStore) {
+        localStorage.setItem('user_email', emailToStore);
+      }
+
       if (data.tenantId) {
         localStorage.setItem('tenantId', String(data.tenantId));
       } else {
@@ -45,6 +72,7 @@ export default function Login({ onLoginSuccess }) {
           localStorage.setItem(`freegstbill_profile_${data.tenantId}`, JSON.stringify({ businessName: data.businessName, tenantId: data.tenantId }));
         }
       }
+      window.dispatchEvent(new Event('fgsb-auth-changed'));
       toast('Signed in with Google successfully!', 'success');
       onLoginSuccess();
     } catch (err) {
@@ -83,7 +111,18 @@ export default function Login({ onLoginSuccess }) {
         localStorage.removeItem('freegstbill_profile');
         sessionStorage.clear();
         localStorage.setItem('jwt_token', data.token);
-        localStorage.setItem('user_email', username || data.username || 'user@example.com');
+
+        let emailToStore = username || data.email || data.username;
+        if (!emailToStore && data.token) {
+          try {
+            const tokenPayload = JSON.parse(atob(data.token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+            emailToStore = tokenPayload.sub || tokenPayload.email;
+          } catch (e) {}
+        }
+        if (emailToStore) {
+          localStorage.setItem('user_email', emailToStore);
+        }
+
         if (data.tenantId) {
           localStorage.setItem('tenantId', String(data.tenantId));
         } else {
@@ -96,6 +135,7 @@ export default function Login({ onLoginSuccess }) {
           }
           window.dispatchEvent(new Event('fgsb-profile-updated'));
         }
+        window.dispatchEvent(new Event('fgsb-auth-changed'));
         toast('Logged in successfully', 'success');
         onLoginSuccess();
       } else {

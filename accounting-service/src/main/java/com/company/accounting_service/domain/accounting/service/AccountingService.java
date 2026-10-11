@@ -37,26 +37,28 @@ public class AccountingService {
     }
 
     private void seedLedger(String name, String group) {
-        Long currentTenant = TenantContext.getCurrentTenant();
-        ledgerRepository.findByNameAndTenantId(name, currentTenant).orElseGet(() -> {
+        Long currentTenant = TenantContext.getCurrentTenant() != null ? TenantContext.getCurrentTenant() : 1L;
+        final Long tenantId = currentTenant;
+        ledgerRepository.findByNameAndTenantId(name, tenantId).orElseGet(() -> {
             Ledger ledger = Ledger.builder()
                     .name(name)
                     .accountGroup(group)
                     .currentBalance(BigDecimal.ZERO)
-                    .tenantId(currentTenant)
+                    .tenantId(tenantId)
                     .build();
             return ledgerRepository.save(ledger);
         });
     }
 
     public Ledger getOrCreateLedger(String name, String group) {
-        Long currentTenant = TenantContext.getCurrentTenant();
-        return ledgerRepository.findByNameAndTenantId(name, currentTenant).orElseGet(() -> {
+        Long currentTenant = TenantContext.getCurrentTenant() != null ? TenantContext.getCurrentTenant() : 1L;
+        final Long tenantId = currentTenant;
+        return ledgerRepository.findByNameAndTenantId(name, tenantId).orElseGet(() -> {
             Ledger ledger = Ledger.builder()
                     .name(name)
                     .accountGroup(group)
                     .currentBalance(BigDecimal.ZERO)
-                    .tenantId(currentTenant)
+                    .tenantId(tenantId)
                     .build();
             return ledgerRepository.save(ledger);
         });
@@ -64,7 +66,8 @@ public class AccountingService {
 
     @Transactional(readOnly = true)
     public List<LedgerDto> getAllLedgers() {
-        return ledgerRepository.findByTenantId(TenantContext.getCurrentTenant()).stream()
+        Long tenantId = TenantContext.getCurrentTenant() != null ? TenantContext.getCurrentTenant() : 1L;
+        return ledgerRepository.findByTenantId(tenantId).stream()
                 .map(l -> LedgerDto.builder()
                         .id(l.getId())
                         .name(l.getName())
@@ -76,7 +79,8 @@ public class AccountingService {
 
     @Transactional(readOnly = true)
     public List<JournalEntryDto> getAllJournalEntries() {
-        return journalEntryRepository.findByTenantIdOrderByEntryDateDesc(TenantContext.getCurrentTenant()).stream()
+        Long tenantId = TenantContext.getCurrentTenant() != null ? TenantContext.getCurrentTenant() : 1L;
+        return journalEntryRepository.findByTenantIdOrderByEntryDateDesc(tenantId).stream()
                 .map(this::mapToDto)
                 .collect(Collectors.toList());
     }
@@ -97,11 +101,12 @@ public class AccountingService {
             throw new RuntimeException("Total Debits (" + totalDebits + ") must equal Total Credits (" + totalCredits + ")");
         }
 
+        Long tenantId = TenantContext.getCurrentTenant() != null ? TenantContext.getCurrentTenant() : 1L;
         JournalEntry entry = JournalEntry.builder()
                 .entryDate(request.getEntryDate())
                 .description(request.getDescription())
                 .referenceNumber(request.getReferenceNumber())
-                .tenantId(TenantContext.getCurrentTenant())
+                .tenantId(tenantId)
                 .build();
 
         for (JournalEntryLineRequest lineReq : request.getLines()) {

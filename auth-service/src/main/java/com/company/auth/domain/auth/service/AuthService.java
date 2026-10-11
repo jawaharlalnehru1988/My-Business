@@ -108,6 +108,7 @@ public class AuthService {
                 .role(savedUser.getRole().name())
                 .tenantId(savedUser.getTenantId())
                 .businessName(businessName)
+                .email(savedUser.getEmail())
                 .build();
     }
 
@@ -164,6 +165,7 @@ public class AuthService {
                 .role(user.getRole().name())
                 .tenantId(user.getTenantId())
                 .businessName(businessName)
+                .email(user.getEmail())
                 .build();
     }
 
@@ -252,6 +254,7 @@ public class AuthService {
                         .role(user.getRole().name())
                         .tenantId(user.getTenantId())
                         .businessName(businessName)
+                        .email(user.getEmail())
                         .build();
 
             } else {
@@ -304,6 +307,7 @@ public class AuthService {
                 .role(user.getRole().name())
                 .tenantId(user.getTenantId())
                 .businessName(busName)
+                .email(user.getEmail())
                 .build();
     }
 }

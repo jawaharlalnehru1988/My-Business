@@ -80,6 +80,40 @@ function App() {
     return true;
   });
 
+  const resolveUserEmail = () => {
+    const stored = localStorage.getItem('user_email');
+    if (stored && stored !== 'user@example.com' && stored.trim() !== '') {
+      return stored.trim();
+    }
+    const token = localStorage.getItem('jwt_token');
+    if (token) {
+      try {
+        const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+        const email = payload.sub || payload.email;
+        if (email && email.trim() !== '') {
+          localStorage.setItem('user_email', email.trim());
+          return email.trim();
+        }
+      } catch (e) {}
+    }
+    return '';
+  };
+
+  const [currentUserEmail, setCurrentUserEmail] = useState(resolveUserEmail);
+
+  useEffect(() => {
+    const updateEmail = () => {
+      setCurrentUserEmail(resolveUserEmail());
+    };
+    updateEmail();
+    window.addEventListener('fgsb-auth-changed', updateEmail);
+    window.addEventListener('storage', updateEmail);
+    return () => {
+      window.removeEventListener('fgsb-auth-changed', updateEmail);
+      window.removeEventListener('storage', updateEmail);
+    };
+  }, [isAuthenticated]);
+
   const [showWizard, setShowWizard] = useState(() => {
     try { return !getPrintSettings().onboardingComplete; } catch { return false; }
   });
@@ -133,6 +167,7 @@ function App() {
     localStorage.removeItem('freegstbill_profile');
     sessionStorage.clear();
     setProfile(null);
+    setCurrentUserEmail('');
     setIsAuthenticated(false);
   };
 
@@ -1457,12 +1492,12 @@ function App() {
             </button>
 
             {/* Logged-In User Profile Chip */}
-            <div className="navbar-user-chip" title={`Logged in as ${localStorage.getItem('user_email') || 'user@example.com'}`}>
+            <div className="navbar-user-chip" title={`Logged in as ${currentUserEmail || resolveUserEmail() || 'User'}`}>
               <div className="user-avatar">
                 <User size={15} />
               </div>
               <div className="user-info">
-                <span className="user-email">{localStorage.getItem('user_email') || 'user@example.com'}</span>
+                <span className="user-email">{currentUserEmail || resolveUserEmail() || 'User'}</span>
                 <span className="user-role">Administrator</span>
               </div>
             </div>
