@@ -3509,3 +3509,131 @@ kbd {
   background: rgba(37, 99, 235, 0.04);
 }
 
+/* =========================================================
+   Mobile Responsive Sidebar & Drawer
+   ========================================================= */
+
+.mobile-menu-toggle-btn {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-secondary, #f1f5f9);
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 8px;
+  width: 38px;
+  height: 38px;
+  color: var(--text-primary, #0f172a);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+}
+
+.mobile-menu-toggle-btn:hover {
+  background: var(--border, #e2e8f0);
+  color: var(--primary, #2563eb);
+}
+
+.mobile-sidebar-close-btn {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  width: 32px;
+  height: 32px;
+  color: #94a3b8;
+  cursor: pointer;
+  margin-left: auto;
+  transition: all 0.15s ease;
+}
+
+.mobile-sidebar-close-btn:hover {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: rgba(239, 68, 68, 0.4);
+  color: #ef4444;
+}
+
+.sidebar-backdrop {
+  display: none;
+}
+
+@media (max-width: 900px) {
+  .mobile-menu-toggle-btn {
+    display: flex;
+  }
+
+  .mobile-sidebar-close-btn {
+    display: flex;
+  }
+
+  .sidebar-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.65);
+    backdrop-filter: blur(4px);
+    z-index: 999;
+    animation: sidebarBackdropFadeIn 0.2s ease-out;
+  }
+
+  .sidebar {
+    position: fixed !important;
+    top: 0 !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    z-index: 1000 !important;
+    width: 280px !important;
+    max-width: 85vw !important;
+    height: 100vh !important;
+    overflow-y: auto !important;
+    box-shadow: 6px 0 28px rgba(0, 0, 0, 0.5) !important;
+    transform: translateX(-100%) !important;
+    transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  }
+
+  .sidebar.sidebar-mobile-open {
+    transform: translateX(0) !important;
+  }
+
+  .main-content {
+    padding: 1.25rem 1rem !important;
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  .top-navbar {
+    margin: -1.25rem -1rem 1rem -1rem !important;
+    padding: 0.75rem 1rem !important;
+    gap: 0.5rem !important;
+  }
+
+  .top-navbar-left {
+    gap: 0.5rem !important;
+  }
+
+  .navbar-search-btn {
+    width: auto !important;
+    max-width: 160px !important;
+    padding: 0.45rem 0.65rem !important;
+  }
+
+  .navbar-search-btn span {
+    display: none !important;
+  }
+
+  .navbar-search-btn::after {
+    content: "Search...";
+    font-size: 0.8rem;
+  }
+
+  .search-kbd {
+    display: none !important;
+  }
+}
+
+@keyframes sidebarBackdropFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+

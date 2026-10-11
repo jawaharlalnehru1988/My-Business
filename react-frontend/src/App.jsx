@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo, lazy, Suspense } from 'react';
 import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
-import { Home, FileText, Settings, Plus, Users, Package, BarChart3, Wallet, RefreshCw, Receipt, BookOpen, Moon, Sun, Download, X, ShoppingCart, ChevronDown, ChevronUp, Building2, Pencil, HelpCircle, Search, Command, Bell, Calculator, User, LogOut, Barcode, Percent, Database } from 'lucide-react';
+import { Home, FileText, Settings, Plus, Users, Package, BarChart3, Wallet, RefreshCw, Receipt, BookOpen, Moon, Sun, Download, X, ShoppingCart, ChevronDown, ChevronUp, Building2, Pencil, HelpCircle, Search, Command, Bell, Calculator, User, LogOut, Barcode, Percent, Database, Menu } from 'lucide-react';
 import { getAllProfiles, saveProfile, getEnabledModules, getAllBills, getAllProducts, getStockAlertSettings, getAllClients, getProfile, getMyWorkspaces, switchWorkspace } from './store';
 import { isModuleEnabled, getUpcomingFilings } from './utils';
 // v1.10.4 — Route-level lazy loading. Prior App.jsx synchronously
@@ -158,6 +158,12 @@ function App() {
 
   const location = useLocation();
   const navigate = useNavigate();
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+
+  // Close mobile sidebar on route change
+  useEffect(() => {
+    setMobileSidebarOpen(false);
+  }, [location.pathname]);
 
   const handleLogout = () => {
     localStorage.removeItem('jwt_token');
@@ -905,17 +911,36 @@ function App() {
           ✨ Finish setup
         </button>
       )}
-      <div className="sidebar">
+      {/* Mobile Backdrop Overlay */}
+      {mobileSidebarOpen && (
+        <div
+          className="sidebar-backdrop"
+          onClick={() => setMobileSidebarOpen(false)}
+          title="Click to close sidebar"
+        />
+      )}
+      <div className={`sidebar ${mobileSidebarOpen ? 'sidebar-mobile-open' : ''}`}>
         <div className="sidebar-brand">
-          <div className="sidebar-logo">
-            <FileText size={22} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', minWidth: 0, flex: 1 }}>
+            <div className="sidebar-logo">
+              <FileText size={22} />
+            </div>
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <h2 className="sidebar-title" style={{ fontSize: '0.98rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '145px' }}>
+                {profile?.businessName || localStorage.getItem('businessName') || 'My Business'}
+              </h2>
+              <p className="sidebar-subtitle">{profile?.gstin || 'Vyapar Edition'}</p>
+            </div>
           </div>
-          <div>
-            <h2 className="sidebar-title" style={{ fontSize: '0.98rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '170px' }}>
-              {profile?.businessName || localStorage.getItem('businessName') || 'My Business'}
-            </h2>
-            <p className="sidebar-subtitle">{profile?.gstin || 'Vyapar Edition'}</p>
-          </div>
+          <button
+            type="button"
+            className="mobile-sidebar-close-btn"
+            onClick={() => setMobileSidebarOpen(false)}
+            title="Close navigation menu"
+            aria-label="Close navigation menu"
+          >
+            <X size={18} />
+          </button>
         </div>
 
         <div className="profile-switcher" ref={profileMenuRef} style={{ position: 'relative' }}>
@@ -1418,6 +1443,15 @@ function App() {
         {/* Top Navigation Bar */}
         <header className="top-navbar">
           <div className="top-navbar-left">
+            <button
+              type="button"
+              className="mobile-menu-toggle-btn"
+              onClick={() => setMobileSidebarOpen(v => !v)}
+              title={mobileSidebarOpen ? "Close menu" : "Open menu"}
+              aria-label="Toggle navigation menu"
+            >
+              <Menu size={20} />
+            </button>
             <button
               className="navbar-search-btn"
               onClick={() => setShowPalette(true)}
