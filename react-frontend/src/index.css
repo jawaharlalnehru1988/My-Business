@@ -628,7 +628,39 @@ body {
 .top-navbar-right {
   display: flex;
   align-items: center;
-  gap: 1rem;
+  gap: 0.75rem;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-x;
+  flex: 1;
+  min-width: 0;
+  justify-content: flex-end;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.35) transparent;
+  padding: 0.2rem 0.15rem;
+}
+
+.top-navbar-right::-webkit-scrollbar {
+  height: 4px;
+}
+
+.top-navbar-right::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.top-navbar-right::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.3);
+  border-radius: 4px;
+}
+
+.top-navbar-right::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.6);
+}
+
+.top-navbar-right > * {
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .navbar-business-chip {
@@ -3610,12 +3642,19 @@ kbd {
 
   .top-navbar-left {
     gap: 0.5rem !important;
+    flex-shrink: 0 !important;
+  }
+
+  .top-navbar-right {
+    justify-content: flex-start !important;
+    gap: 0.5rem !important;
   }
 
   .navbar-search-btn {
     width: auto !important;
-    max-width: 160px !important;
+    max-width: 140px !important;
     padding: 0.45rem 0.65rem !important;
+    flex-shrink: 0 !important;
   }
 
   .navbar-search-btn span {
@@ -3628,6 +3667,31 @@ kbd {
   }
 
   .search-kbd {
+    display: none !important;
+  }
+}
+
+@media (max-width: 520px) {
+  .top-navbar {
+    padding: 0.6rem 0.75rem !important;
+    gap: 0.4rem !important;
+  }
+
+  .top-navbar-left {
+    gap: 0.35rem !important;
+  }
+
+  .navbar-search-btn {
+    width: 38px !important;
+    height: 38px !important;
+    max-width: 38px !important;
+    padding: 0 !important;
+    justify-content: center !important;
+    border-radius: 8px !important;
+  }
+
+  .navbar-search-btn span,
+  .navbar-search-btn::after {
     display: none !important;
   }
 }
