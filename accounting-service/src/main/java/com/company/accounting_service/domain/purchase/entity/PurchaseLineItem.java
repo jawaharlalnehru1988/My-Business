@@ -25,6 +25,9 @@ public class PurchaseLineItem {
     
     private String hsn;
     
+    @Column(length = 20)
+    private String unit;
+
     @Column(precision = 15, scale = 3)
     private BigDecimal quantity;
     
@@ -36,4 +39,10 @@ public class PurchaseLineItem {
     
     @Column(name = "cess_percent", precision = 5, scale = 2)
     private BigDecimal cessPercent;
+
+    @Column(precision = 15, scale = 2)
+    private BigDecimal discount;
+
+    @Column(precision = 15, scale = 2)
+    private BigDecimal amount;
 }

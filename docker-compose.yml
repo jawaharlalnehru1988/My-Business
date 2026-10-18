@@ -3,6 +3,7 @@ version: '3.8'
 services:
   zookeeper:
     image: confluentinc/cp-zookeeper:7.4.0
+    restart: unless-stopped
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
@@ -13,6 +14,7 @@ services:
 
   kafka:
     image: confluentinc/cp-kafka:7.4.0
+    restart: unless-stopped
     depends_on:
       - zookeeper
     environment:
@@ -30,6 +32,7 @@ services:
 
   postgres:
     image: postgres:15-alpine
+    restart: unless-stopped
     environment:
       POSTGRES_DB: accounting_db
       POSTGRES_USER: postgres
@@ -44,6 +47,7 @@ services:
   service-registry:
     build:
       context: ./service-registry
+    restart: unless-stopped
     environment:
       - JAVA_OPTS=-Xms128m -Xmx192m
     deploy:
@@ -54,6 +58,7 @@ services:
   backend:
     build:
       context: ./backend
+    restart: unless-stopped
     depends_on:
       - postgres
       - kafka
@@ -72,6 +77,7 @@ services:
   accounting-service:
     build:
       context: ./accounting-service
+    restart: unless-stopped
     depends_on:
       - postgres
       - kafka
@@ -89,6 +95,7 @@ services:
   inventory-service:
     build:
       context: ./inventory-service
+    restart: unless-stopped
     depends_on:
       - postgres
       - kafka
@@ -106,6 +113,7 @@ services:
   auth-service:
     build:
       context: ./auth-service
+    restart: unless-stopped
     ports:
       - "8085:8085"
     depends_on:
@@ -121,6 +129,7 @@ services:
   api-gateway:
     build:
       context: ./api-gateway
+    restart: unless-stopped
     depends_on:
       - service-registry
     ports:
@@ -137,6 +146,7 @@ services:
   reporting-service:
     build:
       context: ./reporting-service
+    restart: unless-stopped
     depends_on:
       - service-registry
       - backend
@@ -151,6 +161,7 @@ services:
   notification-service:
     build:
       context: ./notification-service
+    restart: unless-stopped
     depends_on:
       - service-registry
       - kafka
@@ -165,6 +176,7 @@ services:
   frontend:
     build:
       context: ./react-frontend
+    restart: unless-stopped
     ports:
       - "8088:80"
     deploy:

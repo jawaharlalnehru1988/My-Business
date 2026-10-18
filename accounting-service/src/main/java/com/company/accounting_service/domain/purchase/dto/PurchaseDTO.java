@@ -15,10 +15,16 @@ public class PurchaseDTO extends ExtensibleDTO {
     private String supplierName;
     private String supplierAddress;
     private String supplierGstin;
+    private String supplierPhone;
     private String invoiceNumber;
     private String paymentStatus;
     private Boolean interstate;
     private Boolean applyRoundOff;
+    private BigDecimal roundOff;
+    private BigDecimal totalAmount;
+    private BigDecimal totalTax;
+    private BigDecimal taxableAmount;
+    private String docType;
     private String note;
     private List<PurchaseLineItemDTO> items;
 
@@ -27,9 +33,12 @@ public class PurchaseDTO extends ExtensibleDTO {
         private Long id;
         private String name;
         private String hsn;
+        private String unit;
         private BigDecimal quantity;
         private BigDecimal rate;
         private BigDecimal taxPercent;
         private BigDecimal cessPercent;
+        private BigDecimal discount;
+        private BigDecimal amount;
     }
 }

@@ -46,10 +46,16 @@ public class PurchaseService {
         purchase.setSupplierName(dto.getSupplierName());
         purchase.setSupplierAddress(dto.getSupplierAddress());
         purchase.setSupplierGstin(dto.getSupplierGstin());
+        purchase.setSupplierPhone(dto.getSupplierPhone());
         purchase.setInvoiceNumber(dto.getInvoiceNumber());
         purchase.setPaymentStatus(dto.getPaymentStatus());
         purchase.setInterstate(dto.getInterstate());
         purchase.setApplyRoundOff(dto.getApplyRoundOff());
+        purchase.setRoundOff(dto.getRoundOff());
+        purchase.setTotalAmount(dto.getTotalAmount());
+        purchase.setTotalTax(dto.getTotalTax());
+        purchase.setTaxableAmount(dto.getTaxableAmount());
+        purchase.setDocType(dto.getDocType());
         purchase.setNote(dto.getNote());
         purchase.setExtraJson(com.company.accounting_service.core.json.ExtraJson.write(dto.extraFields()));
 
@@ -58,10 +64,13 @@ public class PurchaseService {
                 PurchaseLineItem item = new PurchaseLineItem();
                 item.setName(itemDto.getName());
                 item.setHsn(itemDto.getHsn());
+                item.setUnit(itemDto.getUnit());
                 item.setQuantity(itemDto.getQuantity());
                 item.setRate(itemDto.getRate());
                 item.setTaxPercent(itemDto.getTaxPercent());
                 item.setCessPercent(itemDto.getCessPercent());
+                item.setDiscount(itemDto.getDiscount());
+                item.setAmount(itemDto.getAmount());
                 purchase.addItem(item);
             }
         }
@@ -103,10 +112,16 @@ public class PurchaseService {
         dto.setSupplierName(purchase.getSupplierName());
         dto.setSupplierAddress(purchase.getSupplierAddress());
         dto.setSupplierGstin(purchase.getSupplierGstin());
+        dto.setSupplierPhone(purchase.getSupplierPhone());
         dto.setInvoiceNumber(purchase.getInvoiceNumber());
         dto.setPaymentStatus(purchase.getPaymentStatus());
         dto.setInterstate(purchase.getInterstate());
         dto.setApplyRoundOff(purchase.getApplyRoundOff());
+        dto.setRoundOff(purchase.getRoundOff());
+        dto.setTotalAmount(purchase.getTotalAmount());
+        dto.setTotalTax(purchase.getTotalTax());
+        dto.setTaxableAmount(purchase.getTaxableAmount());
+        dto.setDocType(purchase.getDocType());
         dto.setNote(purchase.getNote());
         dto.extraFields().putAll(com.company.accounting_service.core.json.ExtraJson.read(purchase.getExtraJson()));
 
@@ -116,10 +131,13 @@ public class PurchaseService {
                 itemDto.setId(item.getId());
                 itemDto.setName(item.getName());
                 itemDto.setHsn(item.getHsn());
+                itemDto.setUnit(item.getUnit());
                 itemDto.setQuantity(item.getQuantity());
                 itemDto.setRate(item.getRate());
                 itemDto.setTaxPercent(item.getTaxPercent());
                 itemDto.setCessPercent(item.getCessPercent());
+                itemDto.setDiscount(item.getDiscount());
+                itemDto.setAmount(item.getAmount());
                 return itemDto;
             }).collect(Collectors.toList()));
         }

@@ -15,6 +15,7 @@ import { getPrintSettings } from '../utils/printSettings';
 import { toast } from './Toast';
 import { confirmAction, promptAction } from './ConfirmModal';
 import SupplierModal from './SupplierModal';
+import VyaparInvoiceEditor from './VyaparInvoiceEditor';
 
 // Brand accent RGB helper for PDF export
 function getAccentRGB() {
@@ -2000,6 +2001,19 @@ export default function PurchaseBills({
       {/* MODAL: ADD / EDIT PURCHASE BILL                                           */}
       {/* ========================================================================= */}
       {showForm && (
+        <div className="modal-overlay" onClick={closeForm} style={{ zIndex: 1000, overflowY: 'auto', padding: '1rem', display: 'flex', alignItems: 'flex-start', justifyContent: 'center' }}>
+          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '1400px', width: '100%', padding: '0', background: 'transparent', border: 'none', boxShadow: 'none' }}>
+            <VyaparInvoiceEditor
+              entryType="purchase"
+              docType="purchase-bills"
+              editingRecord={editingId ? purchases.find(p => p.id === editingId) : null}
+              onSave={async () => { closeForm(); await loadPurchases(); }}
+              onBack={closeForm}
+            />
+          </div>
+        </div>
+      )}
+      {false && showForm && (
         <div className="modal-overlay" onClick={closeForm}>
           <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '750px' }}>
             <h3 className="section-title">{editingId ? 'Edit Purchase Bill' : 'Add Purchase Bill'}</h3>
@@ -2356,6 +2370,19 @@ export default function PurchaseBills({
       {/* MODAL: ADD / EDIT PURCHASE ORDER                                          */}
       {/* ========================================================================= */}
       {showPoForm && (
+        <div className="modal-overlay" onClick={() => setShowPoForm(false)} style={{ zIndex: 1000, overflowY: 'auto', padding: '1rem', display: 'flex', alignItems: 'flex-start', justifyContent: 'center' }}>
+          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '1400px', width: '100%', padding: '0', background: 'transparent', border: 'none', boxShadow: 'none' }}>
+            <VyaparInvoiceEditor
+              entryType="purchase"
+              docType="purchase-order"
+              editingRecord={editingId ? purchaseOrdersList.find(p => p.id === editingId) : null}
+              onSave={async () => { setShowPoForm(false); setEditingId(null); await loadPurchases(); }}
+              onBack={() => { setShowPoForm(false); setEditingId(null); }}
+            />
+          </div>
+        </div>
+      )}
+      {false && showPoForm && (
         <div className="modal-overlay" onClick={() => setShowPoForm(false)}>
           <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '750px' }}>
             <h3 className="section-title">{editingId ? 'Edit Purchase Order' : 'New Purchase Order'}</h3>
@@ -2498,6 +2525,19 @@ export default function PurchaseBills({
       {/* MODAL: ADD / EDIT PURCHASE RETURN / DEBIT NOTE                             */}
       {/* ========================================================================= */}
       {showReturnForm && (
+        <div className="modal-overlay" onClick={() => setShowReturnForm(false)} style={{ zIndex: 1000, overflowY: 'auto', padding: '1rem', display: 'flex', alignItems: 'flex-start', justifyContent: 'center' }}>
+          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '1400px', width: '100%', padding: '0', background: 'transparent', border: 'none', boxShadow: 'none' }}>
+            <VyaparInvoiceEditor
+              entryType="purchase"
+              docType="purchase-return"
+              editingRecord={editingId ? purchaseReturnsList.find(p => p.id === editingId) : null}
+              onSave={async () => { setShowReturnForm(false); setEditingId(null); await loadPurchases(); }}
+              onBack={() => { setShowReturnForm(false); setEditingId(null); }}
+            />
+          </div>
+        </div>
+      )}
+      {false && showReturnForm && (
         <div className="modal-overlay" onClick={() => setShowReturnForm(false)}>
           <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '750px' }}>
             <h3 className="section-title">{editingId ? 'Edit Debit Note' : 'New Purchase Return / Debit Note'}</h3>

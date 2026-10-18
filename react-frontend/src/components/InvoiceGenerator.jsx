@@ -18,6 +18,7 @@ import { getClientCredit, planCreditApplication } from '../utils/clientCredit';
 import ClientModal from './ClientModal';
 import SupplierModal from './SupplierModal';
 import { toast } from './Toast';
+import VyaparInvoiceEditor from './VyaparInvoiceEditor';
 
 // Rich text editor component that works with contentEditable properly
 function RichEditor({ value, onChange, placeholder, toolbar = false }) {
@@ -2647,11 +2648,60 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
     }
   };
 
+  const [useVyaparMode, setUseVyaparMode] = useState(() => {
+    return localStorage.getItem('gst_entry_mode') !== 'detailed';
+  });
+
+  if (useVyaparMode) {
+    return (
+      <div style={{ padding: '0 0.5rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', maxWidth: '1400px', margin: '0 auto 0.5rem auto' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Entry Style:</span>
+            <span style={{ background: '#ecfdf5', color: '#059669', border: '1px solid #a7f3d0', fontSize: '0.72rem', fontWeight: 700, padding: '2px 8px', borderRadius: 12 }}>
+              ⚡ Vyapar Simple Mode
+            </span>
+          </div>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            style={{ fontSize: '0.74rem', padding: '0.2rem 0.6rem' }}
+            onClick={() => {
+              localStorage.setItem('gst_entry_mode', 'detailed');
+              setUseVyaparMode(false);
+            }}
+          >
+            Switch to Detailed Form
+          </button>
+        </div>
+        <VyaparInvoiceEditor
+          entryType="sale"
+          docType={invoiceType}
+          editingRecord={editingBill}
+          profile={profile}
+          onSave={handleBack}
+          onBack={handleBack}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="generator-container">
       <div className="generator-toolbar">
         <div className="flex gap-2 items-center">
           <button className="btn btn-secondary" onClick={handleBack}><ArrowLeft size={18} /> Back</button>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            style={{ fontSize: '0.78rem', background: '#eff6ff', color: '#2563eb', borderColor: '#bfdbfe', fontWeight: 600 }}
+            onClick={() => {
+              localStorage.setItem('gst_entry_mode', 'vyapar');
+              setUseVyaparMode(true);
+            }}
+          >
+            ⚡ Switch to Vyapar Simple Mode
+          </button>
           <HelpButton title="Invoice Generator — how to use">
             <ul style={{ paddingLeft: '1.1rem', margin: 0 }}>
               <li><strong>Invoice type</strong> — Tax Invoice / Proforma / Bill of Supply / Composition / Credit Note / Delivery Challan. Switching type refreshes the number to that type's counter (or your custom prefix from Print Settings).</li>

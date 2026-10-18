@@ -78,6 +78,7 @@ public class InvoiceService {
                 item.setProductId(itemDto.getProductId());
                 item.setName(itemDto.getName());
                 item.setHsn(itemDto.getHsn());
+                item.setUnit(itemDto.getUnit());
                 item.setQuantity(itemDto.getQuantity());
                 item.setRate(itemDto.getRate());
                 item.setTaxPercent(itemDto.getTaxPercent());
@@ -180,6 +181,7 @@ public class InvoiceService {
                 itemDto.setProductId(item.getProductId());
                 itemDto.setName(item.getName());
                 itemDto.setHsn(item.getHsn());
+                itemDto.setUnit(item.getUnit());
                 itemDto.setQuantity(item.getQuantity());
                 itemDto.setRate(item.getRate());
                 itemDto.setTaxPercent(item.getTaxPercent());

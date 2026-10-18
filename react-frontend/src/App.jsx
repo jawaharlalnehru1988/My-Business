@@ -1529,6 +1529,43 @@ function App() {
               <span style={{ whiteSpace: 'nowrap' }}>Partners</span>
             </button>
 
+            {/* Light / Dark Mode Switcher in Top Header */}
+            <button
+              type="button"
+              className="navbar-theme-toggle"
+              onClick={() => setDarkMode(prev => !prev)}
+              title={darkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+              aria-label={darkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                fontSize: '0.82rem',
+                fontWeight: 600,
+                padding: '0.35rem 0.75rem',
+                borderRadius: '20px',
+                border: darkMode ? '1.5px solid rgba(245, 158, 11, 0.45)' : '1.5px solid rgba(99, 102, 241, 0.35)',
+                background: darkMode ? 'rgba(245, 158, 11, 0.12)' : 'rgba(99, 102, 241, 0.08)',
+                color: darkMode ? '#f59e0b' : '#4f46e5',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+                flexShrink: 0,
+                whiteSpace: 'nowrap'
+              }}
+            >
+              {darkMode ? (
+                <>
+                  <Sun size={15} style={{ color: '#f59e0b', flexShrink: 0 }} />
+                  <span style={{ whiteSpace: 'nowrap' }}>Light</span>
+                </>
+              ) : (
+                <>
+                  <Moon size={15} style={{ color: '#4f46e5', flexShrink: 0 }} />
+                  <span style={{ whiteSpace: 'nowrap' }}>Dark</span>
+                </>
+              )}
+            </button>
+
             {/* Logged-In User Profile Chip */}
             <div className="navbar-user-chip" title={`Logged in as ${currentUserEmail || resolveUserEmail() || 'User'}`} style={{ flexShrink: 0, whiteSpace: 'nowrap' }}>
               <div className="user-avatar" style={{ flexShrink: 0 }}>

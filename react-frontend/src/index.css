@@ -3701,3 +3701,620 @@ kbd {
   to { opacity: 1; }
 }
 
+/* ==========================================================================
+   Vyapar Style Invoice & Purchase Entry System
+   Pixel-perfect imitation of Vyapar Desktop App Interface
+   ========================================================================== */
+
+.vyapar-editor-page {
+  background: var(--bg-secondary, #ffffff);
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+  margin: 0.5rem auto 2rem auto;
+  max-width: 1400px;
+  padding: 1.25rem 1.75rem;
+  font-family: inherit;
+  color: var(--text-primary, #1e293b);
+}
+
+.vyapar-top-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.25rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--border-color, #e2e8f0);
+}
+
+.vyapar-title-group {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+}
+
+.vyapar-title {
+  font-size: 1.6rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text-primary, #0f172a);
+  margin: 0;
+}
+
+/* Credit / Cash Vyapar Pill Toggle */
+.vyapar-toggle-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--bg-tertiary, #f1f5f9);
+  padding: 3px 6px;
+  border-radius: 20px;
+  border: 1px solid var(--border-color, #cbd5e1);
+  user-select: none;
+}
+
+.vyapar-toggle-label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.vyapar-toggle-label.active-credit {
+  color: #2563eb;
+  font-weight: 700;
+}
+
+.vyapar-toggle-label.active-cash {
+  color: #16a34a;
+  font-weight: 700;
+}
+
+.vyapar-toggle-switch {
+  position: relative;
+  width: 40px;
+  height: 22px;
+  background-color: #cbd5e1;
+  border-radius: 11px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.vyapar-toggle-switch.is-cash {
+  background-color: #2563eb;
+}
+
+.vyapar-toggle-switch .vyapar-toggle-slider {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  background-color: #ffffff;
+  border-radius: 50%;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.vyapar-toggle-switch.is-cash .vyapar-toggle-slider {
+  transform: translateX(18px);
+}
+
+/* Top Meta Grid */
+.vyapar-meta-grid {
+  display: grid;
+  grid-template-columns: minmax(320px, 1.2fr) minmax(300px, 1fr);
+  gap: 2rem;
+  margin-bottom: 1.25rem;
+}
+
+.vyapar-party-col {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.vyapar-party-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.vyapar-fieldset {
+  position: relative;
+  border: 1px solid var(--border-color, #cbd5e1);
+  border-radius: 6px;
+  padding: 0.35rem 0.65rem 0.25rem 0.65rem;
+  background: var(--bg-secondary, #ffffff);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.vyapar-fieldset:focus-within {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.12);
+}
+
+.vyapar-floating-label {
+  position: absolute;
+  top: -8px;
+  left: 10px;
+  background: var(--bg-secondary, #ffffff);
+  padding: 0 4px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-secondary, #64748b);
+  line-height: 1;
+}
+
+.vyapar-field-input {
+  width: 100%;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 0.88rem;
+  color: var(--text-primary, #0f172a);
+  padding: 2px 0;
+  margin-top: 2px;
+}
+
+.vyapar-field-textarea {
+  width: 100%;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 0.84rem;
+  color: var(--text-primary, #0f172a);
+  resize: vertical;
+  min-height: 54px;
+}
+
+.vyapar-balance-badge {
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: #ef4444;
+  margin-top: 0.2rem;
+  padding-left: 0.2rem;
+}
+
+/* Right Details Table (Aligned Key-Value) */
+.vyapar-details-table {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  justify-content: flex-start;
+}
+
+.vyapar-detail-row {
+  display: grid;
+  grid-template-columns: 140px 1fr;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.vyapar-detail-label {
+  font-size: 0.82rem;
+  color: var(--text-secondary, #64748b);
+  font-weight: 500;
+  text-align: right;
+}
+
+.vyapar-detail-val-wrap {
+  display: flex;
+  align-items: center;
+  position: relative;
+}
+
+.vyapar-detail-input {
+  width: 100%;
+  padding: 0.35rem 0.6rem;
+  font-size: 0.84rem;
+  border: 1px solid var(--border-color, #cbd5e1);
+  border-radius: 6px;
+  background: var(--bg-secondary, #ffffff);
+  color: var(--text-primary, #0f172a);
+  outline: none;
+}
+
+.vyapar-detail-input:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.12);
+}
+
+/* Vyapar Items Spreadsheet Table */
+.vyapar-table-container {
+  border: 1px solid var(--border-color, #cbd5e1);
+  border-radius: 6px;
+  overflow-x: auto;
+  margin-bottom: 0.75rem;
+  background: var(--bg-secondary, #ffffff);
+}
+
+.vyapar-grid-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+  table-layout: auto;
+}
+
+.vyapar-grid-table th {
+  background: var(--bg-tertiary, #f8fafc);
+  border: 1px solid var(--border-color, #cbd5e1);
+  padding: 6px 8px;
+  font-weight: 600;
+  font-size: 0.76rem;
+  color: var(--text-secondary, #475569);
+  text-align: center;
+  white-space: nowrap;
+}
+
+.vyapar-grid-table td {
+  border: 1px solid var(--border-color, #cbd5e1);
+  padding: 2px 4px;
+  vertical-align: middle;
+}
+
+.vyapar-grid-table tbody tr:hover {
+  background-color: var(--bg-tertiary, rgba(241, 245, 249, 0.5));
+}
+
+.vyapar-cell-input {
+  width: 100%;
+  border: 1px solid transparent;
+  outline: none;
+  background: transparent;
+  font-size: 0.82rem;
+  padding: 4px 6px;
+  border-radius: 4px;
+  color: var(--text-primary, #0f172a);
+}
+
+.vyapar-cell-input:focus {
+  border-color: #2563eb;
+  background: #ffffff;
+  box-shadow: 0 0 0 1px #2563eb;
+}
+
+.vyapar-cell-select {
+  width: 100%;
+  border: 1px solid transparent;
+  outline: none;
+  background: transparent;
+  font-size: 0.8rem;
+  padding: 4px 2px;
+  border-radius: 4px;
+  color: var(--text-primary, #0f172a);
+}
+
+.vyapar-cell-select:focus {
+  border-color: #2563eb;
+  background: #ffffff;
+}
+
+.vyapar-table-summary-row {
+  background: var(--bg-tertiary, #f8fafc);
+  font-weight: 700;
+  border-top: 2px solid var(--border-color, #cbd5e1);
+}
+
+.vyapar-table-summary-row td {
+  padding: 6px 8px;
+  font-size: 0.82rem;
+}
+
+/* Bottom 3-Column Section */
+.vyapar-bottom-grid {
+  display: grid;
+  grid-template-columns: minmax(280px, 1fr) minmax(200px, 0.8fr) minmax(280px, 1fr);
+  gap: 1.5rem;
+  margin-top: 1rem;
+  align-items: start;
+}
+
+.vyapar-terms-box {
+  border: 1px solid var(--border-color, #cbd5e1);
+  border-radius: 8px;
+  padding: 0.85rem;
+  background: var(--bg-secondary, #ffffff);
+}
+
+.vyapar-terms-title {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-primary, #0f172a);
+  margin-bottom: 0.5rem;
+}
+
+.vyapar-actions-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.vyapar-action-pill-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  border: 1px solid var(--border-color, #cbd5e1);
+  background: var(--bg-secondary, #ffffff);
+  color: var(--text-secondary, #475569);
+  padding: 0.5rem 0.85rem;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.vyapar-action-pill-btn:hover {
+  background: var(--bg-tertiary, #f1f5f9);
+  border-color: #94a3b8;
+  color: var(--text-primary, #0f172a);
+}
+
+/* Round off and Grand Total Card */
+.vyapar-total-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  align-items: flex-end;
+}
+
+.vyapar-roundoff-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.84rem;
+  color: var(--text-primary, #334155);
+}
+
+.vyapar-grand-total-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  justify-content: flex-end;
+}
+
+.vyapar-grand-total-label {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text-primary, #0f172a);
+}
+
+.vyapar-grand-total-box {
+  min-width: 170px;
+  max-width: 240px;
+  padding: 0.5rem 0.85rem;
+  border: 1.5px solid var(--border-color, #94a3b8);
+  border-radius: 8px;
+  font-size: 1.35rem;
+  font-weight: 800;
+  text-align: right;
+  color: var(--text-primary, #0f172a);
+  background: var(--bg-secondary, #ffffff);
+}
+
+/* Sticky Bottom Action Footer */
+.vyapar-footer-bar {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border-color, #e2e8f0);
+}
+
+.vyapar-share-dropdown-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: #ffffff;
+  color: #2563eb;
+  border: 1.5px solid #2563eb;
+  padding: 0.5rem 1.15rem;
+  border-radius: 6px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.vyapar-share-dropdown-btn:hover {
+  background: rgba(37, 99, 235, 0.05);
+}
+
+.vyapar-save-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: #2563eb;
+  color: #ffffff;
+  border: 1.5px solid #2563eb;
+  padding: 0.5rem 1.75rem;
+  border-radius: 6px;
+  font-size: 0.92rem;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.25);
+  transition: all 0.15s ease;
+}
+
+.vyapar-save-btn:hover {
+  background: #1d4ed8;
+  border-color: #1d4ed8;
+}
+
+.vyapar-save-btn u {
+  text-decoration: underline;
+}
+
+/* Calculator Modal */
+.vyapar-calc-modal {
+  position: fixed;
+  top: 70px;
+  right: 40px;
+  z-index: 1050;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18);
+  width: 260px;
+  padding: 12px;
+}
+
+@media (max-width: 900px) {
+  .vyapar-meta-grid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+  .vyapar-bottom-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Vyapar Dark Mode Explicit Overrides */
+[data-theme="dark"] .vyapar-editor-page {
+  background: #1e293b;
+  border-color: #334155;
+  color: #f1f5f9;
+}
+
+[data-theme="dark"] .vyapar-top-header {
+  border-color: #334155;
+}
+
+[data-theme="dark"] .vyapar-title {
+  color: #f1f5f9;
+}
+
+[data-theme="dark"] .vyapar-toggle-wrap {
+  background: #0f172a;
+  border-color: #334155;
+}
+
+[data-theme="dark"] .vyapar-fieldset {
+  background: #1e293b;
+  border-color: #334155;
+}
+
+[data-theme="dark"] .vyapar-fieldset:focus-within {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
+[data-theme="dark"] .vyapar-floating-label {
+  background: #1e293b;
+  color: #94a3b8;
+}
+
+[data-theme="dark"] .vyapar-field-input,
+[data-theme="dark"] .vyapar-field-textarea {
+  color: #f1f5f9;
+}
+
+[data-theme="dark"] .vyapar-detail-input {
+  background: #0f172a;
+  border-color: #334155;
+  color: #f1f5f9;
+}
+
+[data-theme="dark"] .vyapar-detail-label {
+  color: #94a3b8;
+}
+
+[data-theme="dark"] .vyapar-table-container {
+  background: #1e293b;
+  border-color: #334155;
+}
+
+[data-theme="dark"] .vyapar-grid-table th {
+  background: #0f172a;
+  border-color: #334155;
+  color: #94a3b8;
+}
+
+[data-theme="dark"] .vyapar-grid-table td {
+  border-color: #334155;
+}
+
+[data-theme="dark"] .vyapar-grid-table tbody tr:hover {
+  background-color: rgba(15, 23, 42, 0.5);
+}
+
+[data-theme="dark"] .vyapar-cell-input {
+  color: #f1f5f9;
+}
+
+[data-theme="dark"] .vyapar-cell-input:focus {
+  background: #0f172a;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 1px #3b82f6;
+}
+
+[data-theme="dark"] .vyapar-cell-select {
+  color: #f1f5f9;
+  background: #1e293b;
+}
+
+[data-theme="dark"] .vyapar-table-summary-row {
+  background: #0f172a;
+  border-color: #334155;
+  color: #f1f5f9;
+}
+
+[data-theme="dark"] .vyapar-table-summary-row td {
+  color: #f1f5f9;
+}
+
+[data-theme="dark"] .vyapar-terms-box {
+  background: #1e293b;
+  border-color: #334155;
+}
+
+[data-theme="dark"] .vyapar-terms-title {
+  color: #f1f5f9;
+}
+
+[data-theme="dark"] .vyapar-action-pill-btn {
+  background: #0f172a;
+  border-color: #334155;
+  color: #94a3b8;
+}
+
+[data-theme="dark"] .vyapar-action-pill-btn:hover {
+  background: #1e293b;
+  color: #f1f5f9;
+  border-color: #475569;
+}
+
+[data-theme="dark"] .vyapar-grand-total-label {
+  color: #f1f5f9;
+}
+
+[data-theme="dark"] .vyapar-grand-total-box {
+  background: #0f172a;
+  border-color: #475569;
+  color: #f1f5f9;
+}
+
+[data-theme="dark"] .vyapar-share-dropdown-btn {
+  background: #1e293b;
+  color: #60a5fa;
+  border-color: #3b82f6;
+}
+
+[data-theme="dark"] .vyapar-footer-bar {
+  border-color: #334155;
+}
+
+[data-theme="dark"] .vyapar-calc-modal {
+  background: #1e293b;
+  border-color: #334155;
+  color: #f1f5f9;
+}
+
+
+

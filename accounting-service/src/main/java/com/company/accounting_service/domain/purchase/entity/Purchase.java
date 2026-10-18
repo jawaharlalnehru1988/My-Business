@@ -31,6 +31,9 @@ public class Purchase {
     @Column(name = "supplier_gstin")
     private String supplierGstin;
 
+    @Column(name = "supplier_phone")
+    private String supplierPhone;
+
     @Column(name = "invoice_number")
     private String invoiceNumber;
 
@@ -41,6 +44,21 @@ public class Purchase {
 
     @Column(name = "apply_round_off")
     private Boolean applyRoundOff;
+
+    @Column(name = "round_off", precision = 15, scale = 2)
+    private java.math.BigDecimal roundOff;
+
+    @Column(name = "total_amount", precision = 15, scale = 2)
+    private java.math.BigDecimal totalAmount;
+
+    @Column(name = "total_tax", precision = 15, scale = 2)
+    private java.math.BigDecimal totalTax;
+
+    @Column(name = "taxable_amount", precision = 15, scale = 2)
+    private java.math.BigDecimal taxableAmount;
+
+    @Column(name = "doc_type", length = 50)
+    private String docType;
 
     @Column(columnDefinition = "TEXT")
     private String note;

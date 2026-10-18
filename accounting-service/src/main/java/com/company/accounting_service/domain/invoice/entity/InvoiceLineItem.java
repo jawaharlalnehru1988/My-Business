@@ -27,6 +27,9 @@ public class InvoiceLineItem {
     private String name;
     private String hsn;
 
+    @Column(length = 20)
+    private String unit;
+
     @Column(precision = 15, scale = 3)
     private BigDecimal quantity;
 

@@ -9,6 +9,7 @@ public class InvoiceLineItemDTO {
     private Long productId;
     private String name;
     private String hsn;
+    private String unit;
     private BigDecimal quantity;
     private BigDecimal rate;
     private BigDecimal taxPercent;
