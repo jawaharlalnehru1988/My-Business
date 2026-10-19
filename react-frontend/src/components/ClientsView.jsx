@@ -46,6 +46,9 @@ export default function ClientsView({ onEdit, onDuplicate, onNew }) {
   const [profile, setProfile] = useState({});
   const [search, setSearch] = useState('');
   const [filterTab, setFilterTab] = useState('all'); // 'all' | 'receivable' | 'payable' | 'zero'
+  const [groupFilter, setGroupFilter] = useState('all');
+  const [txnSearch, setTxnSearch] = useState('');
+  const [txnTypeFilter, setTxnTypeFilter] = useState('all'); // 'all' | 'invoice' | 'payment' | 'credit-note'
   const [selectedPartyName, setSelectedPartyName] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [modalClient, setModalClient] = useState(null);
@@ -202,7 +205,15 @@ export default function ClientsView({ onEdit, onDuplicate, onNew }) {
         return name.toLowerCase().includes(q) ||
           (c?.phone && c.phone.includes(q)) ||
           (c?.city && c.city.toLowerCase().includes(q)) ||
-          (c?.gstin && c.gstin.toLowerCase().includes(q));
+          (c?.gstin && c.gstin.toLowerCase().includes(q)) ||
+          (c?.partyGroup && c.partyGroup.toLowerCase().includes(q));
+      });
+    }
+
+    if (groupFilter !== 'all') {
+      list = list.filter(name => {
+        const c = clients.find(cli => cli.name.toLowerCase() === name.toLowerCase());
+        return (c?.partyGroup || 'General') === groupFilter;
       });
     }
 
@@ -220,7 +231,7 @@ export default function ClientsView({ onEdit, onDuplicate, onNew }) {
       const sb = getClientStats(b);
       return sb.unpaid - sa.unpaid;
     });
-  }, [allClientNames, search, filterTab, clients, bills]);
+  }, [allClientNames, search, groupFilter, filterTab, clients, bills]);
 
   // Selected party object
   const activeParty = useMemo(() => {
@@ -253,8 +264,9 @@ export default function ClientsView({ onEdit, onDuplicate, onNew }) {
     if (opBal !== 0) {
       txns.push({
         id: 'opening-bal',
-        date: '—',
+        date: activeSavedClient?.openingBalanceDate || '—',
         type: 'Opening Balance',
+        category: 'opening',
         ref: 'OPENING',
         debit: opBal > 0 ? opBal : 0,
         credit: opBal < 0 ? Math.abs(opBal) : 0,
@@ -272,6 +284,7 @@ export default function ClientsView({ onEdit, onDuplicate, onNew }) {
         id: b.id,
         date: b.invoiceDate,
         type: isCreditNote ? 'Credit Note' : (INVOICE_TYPES[b.invoiceType]?.label || 'Sale Invoice'),
+        category: isCreditNote ? 'credit-note' : 'invoice',
         ref: b.invoiceNumber,
         debit,
         credit,
@@ -285,7 +298,8 @@ export default function ClientsView({ onEdit, onDuplicate, onNew }) {
           txns.push({
             id: `p-${p.id || p.date}-${Math.random()}`,
             date: p.date || b.invoiceDate,
-            type: `Payment Received (${p.method || 'Cash'})`,
+            type: `Payment-In (${p.method || 'Cash'})`,
+            category: 'payment',
             ref: `Against ${b.invoiceNumber}`,
             debit: 0,
             credit: Number(p.amount) || 0,
@@ -297,7 +311,8 @@ export default function ClientsView({ onEdit, onDuplicate, onNew }) {
         txns.push({
           id: `paid-${b.id}`,
           date: b.invoiceDate,
-          type: 'Payment Received',
+          type: 'Payment-In',
+          category: 'payment',
           ref: `Against ${b.invoiceNumber}`,
           debit: 0,
           credit: Number(b.paidAmount) || 0,
@@ -305,6 +320,22 @@ export default function ClientsView({ onEdit, onDuplicate, onNew }) {
           isPayment: true,
         });
       }
+    }
+
+    // Include standalone Receipt Vouchers not already linked/duplicated in bill payments
+    for (const r of partyReceipts) {
+      if (r.againstInvoice) continue;
+      txns.push({
+        id: `rcp-${r.id || r.receiptNo}`,
+        date: r.date,
+        type: `Payment-In (${r.paymentMode || 'Cash'})`,
+        category: 'payment',
+        ref: r.receiptNo || 'Receipt Voucher',
+        debit: 0,
+        credit: Number(r.amount) || 0,
+        status: 'paid',
+        isPayment: true,
+      });
     }
 
     // Sort chronologically
@@ -326,6 +357,51 @@ export default function ClientsView({ onEdit, onDuplicate, onNew }) {
       };
     });
   }, [ledgerTransactions]);
+
+  // Filtered ledger rows based on right-pane search & type filter
+  const filteredLedgerRows = useMemo(() => {
+    return ledgerWithRunningBalance.filter(tx => {
+      if (txnTypeFilter !== 'all' && tx.category !== txnTypeFilter && !tx.isOpening) return false;
+      if (txnSearch.trim()) {
+        const q = txnSearch.toLowerCase().trim();
+        const matchesRef = String(tx.ref || '').toLowerCase().includes(q);
+        const matchesType = String(tx.type || '').toLowerCase().includes(q);
+        const matchesAmt = String(tx.debit || tx.credit || '').includes(q);
+        return matchesRef || matchesType || matchesAmt;
+      }
+      return true;
+    });
+  }, [ledgerWithRunningBalance, txnTypeFilter, txnSearch]);
+
+  // Export Active Party Ledger to CSV
+  const exportPartyLedgerCSV = () => {
+    if (!activeParty || ledgerWithRunningBalance.length === 0) {
+      toast('No ledger entries to export', 'warning');
+      return;
+    }
+    const headers = ['Date', 'Transaction Type', 'Reference No.', 'Debit (Rs.)', 'Credit (Rs.)', 'Running Balance (Rs.)', 'Dr/Cr', 'Status'];
+    const rows = ledgerWithRunningBalance.map(tx => {
+      const drCr = tx.runningBalance > 0.01 ? 'Dr' : (tx.runningBalance < -0.01 ? 'Cr' : 'Nil');
+      return [
+        tx.date,
+        tx.type,
+        tx.ref,
+        tx.debit || 0,
+        tx.credit || 0,
+        Math.abs(tx.runningBalance).toFixed(2),
+        drCr,
+        tx.status
+      ].map(v => `"${String(v ?? '').replace(/"/g, '""')}"`);
+    });
+    const csv = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const link = document.createElement('a');
+    link.setAttribute('href', encodeURI(csv));
+    link.setAttribute('download', `Ledger_${activeParty.replace(/[^A-Za-z0-9]+/g, '_')}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast(`Ledger CSV downloaded for ${activeParty}`, 'success');
+  };
 
   // WhatsApp Payment Reminder Generator
   const sendWhatsAppReminder = (partyName) => {
@@ -842,8 +918,8 @@ export default function ClientsView({ onEdit, onDuplicate, onNew }) {
             {search && <button className="icon-btn" onClick={() => setSearch('')}><X size={14} /></button>}
           </div>
 
-          {/* Filter Pills */}
-          <div style={{ display: 'flex', gap: '0.35rem', overflowX: 'auto', paddingBottom: '0.5rem', marginBottom: '0.75rem', borderBottom: '1px solid #f1f5f9' }}>
+          {/* Filter Pills + Party Group Dropdown */}
+          <div style={{ display: 'flex', gap: '0.35rem', overflowX: 'auto', paddingBottom: '0.5rem', marginBottom: '0.5rem' }}>
             {[
               { id: 'all', label: `All (${allClientNames.length})` },
               { id: 'receivable', label: `To Receive` },
@@ -871,6 +947,23 @@ export default function ClientsView({ onEdit, onDuplicate, onNew }) {
             ))}
           </div>
 
+          <div style={{ marginBottom: '0.75rem', paddingBottom: '0.5rem', borderBottom: '1px solid #f1f5f9' }}>
+            <select
+              className="form-input"
+              style={{ fontSize: '0.76rem', padding: '0.28rem 0.5rem' }}
+              value={groupFilter}
+              onChange={e => setGroupFilter(e.target.value)}
+            >
+              <option value="all">All Party Groups</option>
+              <option value="General">General</option>
+              <option value="Wholesale">Wholesale</option>
+              <option value="Retail">Retail</option>
+              <option value="VIP">VIP</option>
+              <option value="Distributor">Distributor</option>
+              <option value="Government / B2G">Government / B2G</option>
+            </select>
+          </div>
+
           {/* Parties Scroll List */}
           <div style={{ maxHeight: '680px', overflowY: 'auto', paddingRight: '4px' }}>
             {filteredAndSortedParties.length === 0 ? (
@@ -885,6 +978,7 @@ export default function ClientsView({ onEdit, onDuplicate, onNew }) {
                 const isSelected = activeParty === partyName;
                 const isDue = stats.unpaid > 0.01;
                 const isAdv = stats.unpaid < -0.01;
+                const overLimit = Boolean(savedClient?.creditLimitEnabled && Number(savedClient?.creditLimit) > 0 && stats.unpaid > Number(savedClient.creditLimit));
 
                 return (
                   <div
@@ -919,11 +1013,19 @@ export default function ClientsView({ onEdit, onDuplicate, onNew }) {
                         {partyName.charAt(0).toUpperCase()}
                       </div>
                       <div>
-                        <div style={{ fontWeight: isSelected ? 700 : 600, fontSize: '0.88rem', color: '#0f172a', lineHeight: 1.2 }}>
-                          {partyName}
+                        <div style={{ fontWeight: isSelected ? 700 : 600, fontSize: '0.88rem', color: '#0f172a', lineHeight: 1.2, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <span>{partyName}</span>
+                          {overLimit && (
+                            <span title={`Credit limit of ${formatCurrency(savedClient.creditLimit)} exceeded!`} style={{ color: '#d97706', fontSize: '0.72rem' }}>⚠</span>
+                          )}
                         </div>
-                        <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: 2 }}>
-                          {savedClient?.phone || savedClient?.city || `${stats.count} bills`}
+                        <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: 2, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <span>{savedClient?.phone || savedClient?.city || `${stats.count} bills`}</span>
+                          {savedClient?.partyGroup && savedClient.partyGroup !== 'General' && (
+                            <span style={{ background: '#f1f5f9', padding: '0 4px', borderRadius: 3, fontSize: '0.65rem', fontWeight: 600 }}>
+                              {savedClient.partyGroup}
+                            </span>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -958,17 +1060,57 @@ export default function ClientsView({ onEdit, onDuplicate, onNew }) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
           {activeParty ? (
             <>
+              {/* Credit Limit Exceeded Warning Banner */}
+              {activeSavedClient?.creditLimitEnabled && Number(activeSavedClient?.creditLimit) > 0 && activeStats.unpaid > Number(activeSavedClient.creditLimit) && (
+                <div style={{
+                  padding: '0.7rem 1rem',
+                  borderRadius: '8px',
+                  background: '#fffbeb',
+                  border: '1px solid #fde68a',
+                  color: '#92400e',
+                  fontSize: '0.82rem',
+                  fontWeight: 600,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '0.75rem'
+                }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <AlertCircle size={16} style={{ color: '#d97706' }} />
+                    Credit Limit Exceeded! Current receivable <strong>{formatCurrency(activeStats.unpaid)}</strong> exceeds the allowed limit of <strong>{formatCurrency(activeSavedClient.creditLimit)}</strong>.
+                  </span>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    style={{ fontSize: '0.74rem', padding: '0.25rem 0.6rem' }}
+                    onClick={() => sendWhatsAppReminder(activeParty)}
+                  >
+                    Send Reminder
+                  </button>
+                </div>
+              )}
+
               {/* Party Profile Hero Card */}
               <div className="glass-panel" style={{ padding: '1.5rem', borderRadius: '12px', border: '1px solid #e2e8f0', background: '#ffffff' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem', borderBottom: '1px solid #f1f5f9', paddingBottom: '1.25rem' }}>
                   <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                       <h2 style={{ fontSize: '1.5rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
                         {activeParty}
                       </h2>
+                      {activeSavedClient?.partyGroup && (
+                        <span style={{ background: '#eff6ff', border: '1px solid #bfdbfe', fontSize: '0.72rem', padding: '2px 8px', borderRadius: 999, color: '#1d4ed8', fontWeight: 700 }}>
+                          {activeSavedClient.partyGroup}
+                        </span>
+                      )}
                       {activeSavedClient?.gstin && (
                         <span style={{ background: '#f8fafc', border: '1px solid #e2e8f0', fontSize: '0.75rem', padding: '2px 8px', borderRadius: 4, color: '#475569', fontWeight: 600 }}>
                           GSTIN: {activeSavedClient.gstin}
+                        </span>
+                      )}
+                      {activeSavedClient?.gstType && (
+                        <span style={{ fontSize: '0.72rem', color: '#64748b' }}>
+                          ({activeSavedClient.gstType})
                         </span>
                       )}
                     </div>
@@ -983,7 +1125,15 @@ export default function ClientsView({ onEdit, onDuplicate, onNew }) {
                           <MapPin size={14} /> {[activeSavedClient.address, activeSavedClient.city, activeSavedClient.state].filter(Boolean).join(', ')}
                         </span>
                       )}
+                      {activeSavedClient?.shippingAddress && (
+                        <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                          🚚 Ship To: {activeSavedClient.shippingAddress}
+                        </span>
+                      )}
                       {activeSavedClient?.email && <span>✉ {activeSavedClient.email}</span>}
+                      {activeSavedClient?.creditLimitEnabled && Number(activeSavedClient?.creditLimit) > 0 && (
+                        <span>Credit Limit: <strong>{formatCurrency(activeSavedClient.creditLimit)}</strong></span>
+                      )}
                     </div>
                   </div>
 
@@ -1049,6 +1199,16 @@ export default function ClientsView({ onEdit, onDuplicate, onNew }) {
                   <button
                     type="button"
                     className="btn btn-secondary"
+                    onClick={exportPartyLedgerCSV}
+                    style={{ fontWeight: 600, padding: '0.45rem 0.9rem' }}
+                    title="Export party transactions ledger to CSV / Excel"
+                  >
+                    <Download size={15} /> Ledger CSV
+                  </button>
+
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
                     onClick={() => onNew && onNew({ invoiceType: 'tax-invoice', clientName: activeParty, data: { client: activeSavedClient } })}
                     style={{ fontWeight: 600, padding: '0.45rem 0.9rem' }}
                     title="Create new invoice for this party"
@@ -1057,15 +1217,24 @@ export default function ClientsView({ onEdit, onDuplicate, onNew }) {
                   </button>
 
                   <div style={{ marginLeft: 'auto', display: 'flex', gap: '0.4rem' }}>
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      onClick={() => openEditClient(activeSavedClient)}
+                      style={{ fontSize: '0.8rem', padding: '0.45rem 0.75rem' }}
+                      title="Edit party details, Opening Balance & Credit Limit"
+                    >
+                      <Edit3 size={14} /> Edit
+                    </button>
                     {activeSavedClient?.id && (
                       <button
                         type="button"
                         className="btn btn-secondary"
-                        onClick={() => openEditClient(activeSavedClient)}
-                        style={{ fontSize: '0.8rem', padding: '0.45rem 0.75rem' }}
-                        title="Edit party details"
+                        onClick={() => handleDeleteClient(activeSavedClient.id)}
+                        style={{ fontSize: '0.8rem', padding: '0.45rem 0.75rem', color: '#dc2626' }}
+                        title="Delete saved party profile"
                       >
-                        <Edit3 size={14} /> Edit
+                        <Trash2 size={14} />
                       </button>
                     )}
                   </div>
@@ -1098,18 +1267,38 @@ export default function ClientsView({ onEdit, onDuplicate, onNew }) {
 
               {/* Detailed Transactions Ledger Table */}
               <div className="glass-panel" style={{ padding: '1.25rem', borderRadius: '12px', border: '1px solid #e2e8f0', background: '#ffffff' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1rem' }}>
                   <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <Receipt size={18} color="#2563eb" /> Account Transactions Ledger (Dr / Cr)
+                    <Receipt size={18} color="#2563eb" /> Transactions &amp; Dr / Cr Ledger
                   </h3>
-                  <span style={{ fontSize: '0.8rem', color: '#64748b' }}>
-                    {ledgerWithRunningBalance.length} transaction{ledgerWithRunningBalance.length !== 1 ? 's' : ''}
-                  </span>
+
+                  {/* Vyapar Right-Pane Transaction Filter & Search Bar */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                    <select
+                      className="form-input"
+                      style={{ fontSize: '0.78rem', padding: '0.3rem 0.6rem', width: 'auto' }}
+                      value={txnTypeFilter}
+                      onChange={e => setTxnTypeFilter(e.target.value)}
+                    >
+                      <option value="all">All Txns ({ledgerWithRunningBalance.length})</option>
+                      <option value="invoice">Sale Invoices</option>
+                      <option value="payment">Payment-In</option>
+                      <option value="credit-note">Credit Notes</option>
+                    </select>
+                    <input
+                      type="text"
+                      className="form-input"
+                      style={{ fontSize: '0.78rem', padding: '0.3rem 0.65rem', width: '190px' }}
+                      placeholder="Search ref # or amount..."
+                      value={txnSearch}
+                      onChange={e => setTxnSearch(e.target.value)}
+                    />
+                  </div>
                 </div>
 
-                {ledgerWithRunningBalance.length === 0 ? (
+                {filteredLedgerRows.length === 0 ? (
                   <div style={{ padding: '3rem 1rem', textAlign: 'center', color: '#94a3b8' }}>
-                    <p style={{ fontSize: '0.9rem', marginBottom: '0.5rem' }}>No transactions recorded for {activeParty} yet.</p>
+                    <p style={{ fontSize: '0.9rem', marginBottom: '0.5rem' }}>No matching transactions for {activeParty}.</p>
                     <button
                       type="button"
                       className="btn btn-primary"
@@ -1134,7 +1323,7 @@ export default function ClientsView({ onEdit, onDuplicate, onNew }) {
                         </tr>
                       </thead>
                       <tbody>
-                        {ledgerWithRunningBalance.map((tx, idx) => {
+                        {filteredLedgerRows.map((tx, idx) => {
                           const isDr = tx.runningBalance > 0.01;
                           const isCr = tx.runningBalance < -0.01;
 

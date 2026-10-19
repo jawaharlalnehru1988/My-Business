@@ -40,7 +40,11 @@ export default function SuppliersView({ onNewPurchase }) {
   const [profile, setProfile] = useState({});
   const [search, setSearch] = useState('');
   const [filterTab, setFilterTab] = useState('all'); // 'all' | 'to_pay' | 'zero'
+  const [groupFilter, setGroupFilter] = useState('all');
+  const [txnSearch, setTxnSearch] = useState('');
+  const [txnTypeFilter, setTxnTypeFilter] = useState('all'); // 'all' | 'PURCHASE_BILL' | 'PAYMENT_OUT' | 'DEBIT_NOTE'
   const [selectedSupplierId, setSelectedSupplierId] = useState(null);
+  const csvInputRef = useRef(null);
 
   // Modals
   const [showSupplierModal, setShowSupplierModal] = useState(false);
@@ -80,7 +84,7 @@ export default function SuppliersView({ onNewPurchase }) {
 
       // Default select first supplier if none selected
       if (sups.length > 0 && !selectedSupplierId) {
-        setSelectedSupplierId(sups[0].id);
+        setSelectedSupplierId(sups[0].id || sups[0].name);
       }
     } catch (err) {
       console.error(err);
@@ -92,10 +96,37 @@ export default function SuppliersView({ onNewPurchase }) {
     loadData();
   }, []);
 
+  // Merge saved suppliers with any auto-discovered supplier names from purchase bills
+  const allVendors = useMemo(() => {
+    const mapByName = new Map();
+    for (const s of suppliers) {
+      if (!s?.name) continue;
+      mapByName.set(s.name.trim().toLowerCase(), { ...s, id: s.id || s.name });
+    }
+    for (const p of purchases) {
+      const pName = (p.supplierName || '').trim();
+      if (!pName) continue;
+      const key = pName.toLowerCase();
+      if (!mapByName.has(key)) {
+        mapByName.set(key, {
+          id: `auto:${pName}`,
+          name: pName,
+          gstin: p.supplierGstin || '',
+          phone: p.supplierPhone || '',
+          address: p.supplierAddress || '',
+          state: p.stateOfSupply || '',
+          partyGroup: 'General',
+          isAutoDiscovered: true,
+        });
+      }
+    }
+    return Array.from(mapByName.values());
+  }, [suppliers, purchases]);
+
   // Selected Active Supplier
   const activeSupplier = useMemo(() => {
-    return suppliers.find(s => String(s.id) === String(selectedSupplierId)) || suppliers[0] || null;
-  }, [suppliers, selectedSupplierId]);
+    return allVendors.find(s => String(s.id) === String(selectedSupplierId) || s.name === selectedSupplierId) || allVendors[0] || null;
+  }, [allVendors, selectedSupplierId]);
 
   // Purchases for a specific supplier
   const getSupplierPurchases = (supplier) => {
@@ -122,52 +153,82 @@ export default function SuppliersView({ onNewPurchase }) {
     });
   };
 
-  // Supplier Financial Stats Calculation
+  // Supplier Financial Stats Calculation (including Opening Balance & Debit Notes)
   const getSupplierStats = (supplier) => {
-    if (!supplier) return { totalPurchases: 0, paid: 0, pendingPayable: 0, billCount: 0 };
-    const sPurchases = getSupplierPurchases(supplier);
+    if (!supplier) return { totalPurchases: 0, paid: 0, pendingPayable: 0, openingBalance: 0, billCount: 0 };
+    const sPurchases = getSupplierPurchases(supplier).filter(p => p.docType !== 'purchase-order');
     const sPayOuts = getSupplierPaymentOuts(supplier);
+    const openingBal = Number(supplier.openingBalance) || 0;
 
     let totalPurchases = 0;
+    let totalReturns = 0;
     let paidFromBills = 0;
-    let pendingPayable = 0;
+    let billCount = 0;
 
     sPurchases.forEach(p => {
       const amt = Number(p.totalAmount) || 0;
+      if (p.docType === 'purchase-return') {
+        totalReturns += amt;
+        return;
+      }
+      billCount++;
       const paid = Number(p.paidAmount) || (p.paymentStatus === 'Paid' ? amt : 0);
       totalPurchases += amt;
       paidFromBills += paid;
-
-      if (p.paymentStatus === 'Unpaid' || !p.paymentStatus) {
-        pendingPayable += (amt - paid);
-      } else if (p.paymentStatus === 'Partial') {
-        pendingPayable += Math.max(0, amt - paid);
-      }
     });
 
-    // Also factor in ad-hoc Payment-Out records not yet mapped to bills
-    const adHocPaid = sPayOuts.filter(po => po.linkedBillId === '__fifo__' || !po.linkedBillId)
+    // Also factor in standalone Payment-Out records not already reflected in paidFromBills
+    const standalonePaid = sPayOuts
+      .filter(po => (!po.settledBills || po.settledBills.length === 0) && (po.linkedBillId === '__fifo__' || !po.linkedBillId))
       .reduce((sum, po) => sum + (Number(po.amount) || 0), 0);
 
-    const netPayable = Math.max(0, pendingPayable - (adHocPaid > paidFromBills ? (adHocPaid - paidFromBills) : 0));
+    const totalPaid = paidFromBills + standalonePaid;
+    const netPayable = openingBal + totalPurchases - totalReturns - totalPaid;
 
     return {
       totalPurchases,
-      paid: paidFromBills,
-      pendingPayable: netPayable,
-      billCount: sPurchases.length
+      totalReturns,
+      paid: totalPaid,
+      openingBalance: openingBal,
+      pendingPayable: Math.max(0, netPayable),
+      netBalance: netPayable,
+      billCount
     };
+  };
+
+  // Supplier Aging Analysis (0-30, 31-60, 61-90, 90+ Days)
+  const getSupplierAging = (supplier) => {
+    const buckets = { current: 0, d31_60: 0, d61_90: 0, d90plus: 0, total: 0 };
+    if (!supplier) return buckets;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const bills = getSupplierPurchases(supplier).filter(p => !p.docType || p.docType === 'purchase-bills');
+    for (const b of bills) {
+      const amt = Number(b.totalAmount) || 0;
+      const paid = Number(b.paidAmount) || (b.paymentStatus === 'Paid' ? amt : 0);
+      const due = Math.max(0, amt - paid);
+      if (due <= 0.01) continue;
+      const refDate = b.dueDate || b.date ? new Date(b.dueDate || b.date) : today;
+      const ageDays = Math.max(0, Math.floor((today - refDate) / 86400000));
+      if (ageDays <= 30) buckets.current += due;
+      else if (ageDays <= 60) buckets.d31_60 += due;
+      else if (ageDays <= 90) buckets.d61_90 += due;
+      else buckets.d90plus += due;
+      buckets.total += due;
+    }
+    return buckets;
   };
 
   // Top KPI Summary Bar
   const summaryKPI = useMemo(() => {
-    let totalVendors = suppliers.length;
+    let totalVendors = allVendors.length;
     let totalPurchases = 0;
     let totalPayables = 0;
     let toPayCount = 0;
     let zeroBalCount = 0;
 
-    suppliers.forEach(s => {
+    allVendors.forEach(s => {
       const stats = getSupplierStats(s);
       totalPurchases += stats.totalPurchases;
       totalPayables += stats.pendingPayable;
@@ -186,72 +247,123 @@ export default function SuppliersView({ onNewPurchase }) {
       toPayCount,
       zeroBalCount
     };
-  }, [suppliers, purchases, paymentOuts]);
+  }, [allVendors, purchases, paymentOuts]);
+
+  // Distinct Party Groups for filter dropdown
+  const partyGroups = useMemo(() => {
+    const groups = new Set();
+    allVendors.forEach(s => {
+      if (s.partyGroup) groups.add(s.partyGroup);
+    });
+    return Array.from(groups).sort();
+  }, [allVendors]);
 
   // Filtered Suppliers List
   const filteredSuppliers = useMemo(() => {
     const q = search.trim().toLowerCase();
 
-    return suppliers.filter(s => {
+    return allVendors.filter(s => {
       const matchesSearch = !q || (
         (s.name || '').toLowerCase().includes(q) ||
         (s.gstin || '').toLowerCase().includes(q) ||
         (s.phone || '').toLowerCase().includes(q) ||
         (s.city || '').toLowerCase().includes(q) ||
-        (s.state || '').toLowerCase().includes(q)
+        (s.state || '').toLowerCase().includes(q) ||
+        (s.partyGroup || '').toLowerCase().includes(q)
       );
       if (!matchesSearch) return false;
+
+      if (groupFilter !== 'all' && (s.partyGroup || 'General') !== groupFilter) {
+        return false;
+      }
 
       const stats = getSupplierStats(s);
       if (filterTab === 'to_pay') return stats.pendingPayable > 0.01;
       if (filterTab === 'zero') return stats.pendingPayable <= 0.01;
 
       return true;
-    });
-  }, [suppliers, search, filterTab, purchases, paymentOuts]);
+    }).sort((a, b) => getSupplierStats(b).pendingPayable - getSupplierStats(a).pendingPayable);
+  }, [allVendors, search, groupFilter, filterTab, purchases, paymentOuts]);
 
   // Chronological Dr / Cr Transactions Ledger for Active Supplier
   const activeLedgerTransactions = useMemo(() => {
     if (!activeSupplier) return [];
     const txns = [];
-    const sPurchases = getSupplierPurchases(activeSupplier);
+    const sPurchases = getSupplierPurchases(activeSupplier).filter(p => p.docType !== 'purchase-order');
     const sPayOuts = getSupplierPaymentOuts(activeSupplier);
 
-    // 1. Credit entries: Purchase Bills (increases amount we owe vendor)
+    // 0. Opening Balance row
+    const opBal = Number(activeSupplier.openingBalance) || 0;
+    if (opBal !== 0) {
+      txns.push({
+        id: 'sup-opening',
+        date: activeSupplier.openingBalanceDate || '',
+        type: 'OPENING',
+        typeLabel: 'Opening Balance',
+        refNo: 'OPENING',
+        debit: opBal < 0 ? Math.abs(opBal) : 0,
+        credit: opBal > 0 ? opBal : 0,
+        notes: opBal > 0 ? 'Opening Payable' : 'Opening Advance',
+        status: 'Recorded',
+        isOpening: true
+      });
+    }
+
+    const embeddedPaymentIds = new Set();
+
+    // 1. Purchase Bills (Credit) & Purchase Returns / Debit Notes (Debit)
     sPurchases.forEach(p => {
       const billAmt = Number(p.totalAmount) || 0;
+      const isReturn = p.docType === 'purchase-return';
+
       txns.push({
         id: `pur-${p.id || p.invoiceNumber}`,
         date: p.date || '',
-        type: 'PURCHASE_BILL',
-        typeLabel: 'Purchase Bill',
+        type: isReturn ? 'DEBIT_NOTE' : 'PURCHASE_BILL',
+        typeLabel: isReturn ? 'Debit Note / Return' : 'Purchase Bill',
         refNo: p.invoiceNumber || 'PUR',
-        debit: 0,
-        credit: billAmt,
-        notes: p.note || 'Vendor Invoice',
+        debit: isReturn ? billAmt : 0,
+        credit: isReturn ? 0 : billAmt,
+        notes: p.note || (isReturn ? (p.returnReason || 'Purchase Return') : 'Vendor Invoice'),
         status: p.paymentStatus || 'Unpaid'
       });
 
       // If bill has recorded payments directly in its payments array
-      if (Array.isArray(p.payments) && p.payments.length > 0) {
+      if (!isReturn && Array.isArray(p.payments) && p.payments.length > 0) {
         p.payments.forEach((pay, idx) => {
+          if (pay.id) embeddedPaymentIds.add(String(pay.id));
           txns.push({
             id: `pay-${p.id}-${idx}`,
             date: pay.date || p.date,
             type: 'PAYMENT_OUT',
-            typeLabel: 'Payment-Out',
+            typeLabel: `Payment-Out (${pay.mode || pay.method || 'Cash'})`,
             refNo: `Against ${p.invoiceNumber}`,
             debit: Number(pay.amount) || 0,
             credit: 0,
-            notes: pay.notes || pay.method || 'Vendor Payment',
+            notes: pay.note || pay.notes || 'Bill Settlement',
             status: 'Settled'
           });
+        });
+      } else if (!isReturn && (Number(p.paidAmount) > 0 || p.paymentStatus === 'Paid')) {
+        const paidVal = Number(p.paidAmount) || billAmt;
+        txns.push({
+          id: `pay-inline-${p.id || p.invoiceNumber}`,
+          date: p.date || '',
+          type: 'PAYMENT_OUT',
+          typeLabel: `Payment-Out (${p.paymentType || 'Cash'})`,
+          refNo: `Against ${p.invoiceNumber}`,
+          debit: paidVal,
+          credit: 0,
+          notes: 'Paid on Bill Entry',
+          status: 'Settled'
         });
       }
     });
 
-    // 2. Debit entries: External Payment-Out vouchers (decreases amount we owe)
+    // 2. Standalone Payment-Out vouchers not already in embeddedPaymentIds
     sPayOuts.forEach(po => {
+      if (embeddedPaymentIds.has(String(po.id))) return;
+      if (Array.isArray(po.settledBills) && po.settledBills.length > 0) return;
       txns.push({
         id: po.id,
         date: po.date || '',
@@ -266,7 +378,11 @@ export default function SuppliersView({ onNewPurchase }) {
     });
 
     // Sort chronologically ascending
-    txns.sort((a, b) => new Date(a.date || 0) - new Date(b.date || 0));
+    txns.sort((a, b) => {
+      if (a.isOpening) return -1;
+      if (b.isOpening) return 1;
+      return new Date(a.date || 0) - new Date(b.date || 0);
+    });
 
     // Calculate running balance (Credit - Debit = You'll Pay balance)
     let running = 0;
@@ -279,6 +395,59 @@ export default function SuppliersView({ onNewPurchase }) {
     });
   }, [activeSupplier, purchases, paymentOuts]);
 
+  // Filtered Ledger Rows for Right-Pane Search & Filter
+  const filteredSupplierLedger = useMemo(() => {
+    return activeLedgerTransactions.filter(tx => {
+      if (txnTypeFilter !== 'all' && tx.type !== txnTypeFilter && !tx.isOpening) return false;
+      if (txnSearch.trim()) {
+        const q = txnSearch.toLowerCase().trim();
+        return String(tx.refNo || '').toLowerCase().includes(q) ||
+          String(tx.typeLabel || '').toLowerCase().includes(q) ||
+          String(tx.notes || '').toLowerCase().includes(q) ||
+          String(tx.debit || tx.credit || '').includes(q);
+      }
+      return true;
+    });
+  }, [activeLedgerTransactions, txnTypeFilter, txnSearch]);
+
+  // CSV Import Handler for Suppliers
+  const handleCSVImport = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const lines = text.split(/\r?\n/).filter(l => l.trim());
+      if (lines.length < 2) { toast('CSV file is empty', 'warning'); return; }
+      const headers = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/['"]/g, ''));
+      let imported = 0;
+      for (let i = 1; i < lines.length; i++) {
+        const values = lines[i].split(',').map(v => v.trim().replace(/^"|"$/g, ''));
+        if (values.length === 0) continue;
+        const row = {};
+        headers.forEach((h, idx) => { row[h] = values[idx] || ''; });
+        const name = row.name || row.supplier || row['supplier name'] || '';
+        if (!name) continue;
+        await saveSupplier({
+          name,
+          gstin: row.gstin || '',
+          phone: row.phone || '',
+          email: row.email || '',
+          address: row.address || '',
+          city: row.city || '',
+          state: row.state || '',
+          bankName: row['bank name'] || row.bankname || '',
+          accountNumber: row['account no'] || row.accountnumber || '',
+          ifscCode: row.ifsc || row.ifsccode || '',
+        });
+        imported++;
+      }
+      toast(`Imported ${imported} suppliers`, 'success');
+      await loadData();
+    } catch {
+      toast('Failed to import suppliers CSV', 'error');
+    }
+  };
+
   // Form Handlers
   const handleAddSupplier = () => {
     setModalSupplier(null);
@@ -288,13 +457,15 @@ export default function SuppliersView({ onNewPurchase }) {
 
   const handleEditSupplier = (supplier) => {
     setModalSupplier(supplier);
-    setIsEditing(true);
+    setIsEditing(!supplier?.isAutoDiscovered);
     setShowSupplierModal(true);
   };
 
   const handleSaveSupplier = async (formData) => {
     try {
-      const payload = isEditing && modalSupplier?.id ? { ...formData, id: modalSupplier.id } : formData;
+      const payload = isEditing && modalSupplier?.id && !String(modalSupplier.id).startsWith('auto:')
+        ? { ...formData, id: modalSupplier.id }
+        : formData;
       const saved = await saveSupplier(payload);
       toast(isEditing ? 'Supplier updated' : 'Supplier added', 'success');
       setShowSupplierModal(false);
@@ -479,7 +650,7 @@ export default function SuppliersView({ onNewPurchase }) {
       const { jsPDF } = await import('jspdf');
       const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
       const stats = getSupplierStats(supplier);
-      const pageW = 210, marginL = 15, marginR = 195, tableW = marginR - marginL;
+      const marginL = 15, marginR = 195, tableW = marginR - marginL;
 
       const fmt = (n) => {
         const v = Number(n) || 0;
@@ -738,7 +909,7 @@ export default function SuppliersView({ onNewPurchase }) {
         {/* Filter Pills */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
           {[
-            { id: 'all', label: `All Suppliers (${suppliers.length})` },
+            { id: 'all', label: `All Suppliers (${allVendors.length})` },
             { id: 'to_pay', label: `To Pay (${summaryKPI.toPayCount})`, alert: summaryKPI.toPayCount > 0 },
             { id: 'zero', label: `Zero Balance (${summaryKPI.zeroBalCount})` },
           ].map(tab => (
@@ -763,10 +934,39 @@ export default function SuppliersView({ onNewPurchase }) {
               {tab.label}
             </button>
           ))}
+
+          {partyGroups.length > 0 && (
+            <select
+              value={groupFilter}
+              onChange={(e) => setGroupFilter(e.target.value)}
+              style={{
+                padding: '0.38rem 0.65rem',
+                borderRadius: '6px',
+                fontSize: '0.8rem',
+                fontWeight: 600,
+                border: '1px solid var(--border-color, #d1d5db)',
+                background: 'var(--bg-secondary, #ffffff)',
+                color: 'var(--text-primary, #374151)',
+                cursor: 'pointer'
+              }}
+              title="Filter by Vyapar Party Group">
+              <option value="all">All Groups</option>
+              {partyGroups.map(g => <option key={g} value={g}>{g}</option>)}
+            </select>
+          )}
         </div>
 
         {/* Right Actions */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+          <input ref={csvInputRef} type="file" accept=".csv" onChange={handleCSVImport} style={{ display: 'none' }} />
+          <button
+            onClick={() => csvInputRef.current?.click()}
+            className="btn btn-secondary"
+            style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', padding: '0.45rem 0.8rem', fontSize: '0.82rem' }}
+            title="Import Suppliers from CSV">
+            <Upload size={15} /> Import CSV
+          </button>
+
           <button
             onClick={exportSuppliersCSV}
             className="btn btn-secondary"
@@ -864,6 +1064,8 @@ export default function SuppliersView({ onNewPurchase }) {
                 const isSelected = activeSupplier && String(activeSupplier.id) === String(supplier.id);
                 const stats = getSupplierStats(supplier);
                 const hasPending = stats.pendingPayable > 0.01;
+                const creditLimitVal = supplier.creditLimitEnabled && Number(supplier.creditLimit) > 0 ? Number(supplier.creditLimit) : 0;
+                const overLimit = creditLimitVal > 0 && stats.pendingPayable > creditLimitVal;
 
                 return (
                   <div
@@ -881,8 +1083,11 @@ export default function SuppliersView({ onNewPurchase }) {
                       gap: '0.25rem'
                     }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem' }}>
-                      <div style={{ fontWeight: 600, fontSize: '0.88rem', color: 'var(--text-primary, #111827)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {supplier.name}
+                      <div style={{ fontWeight: 600, fontSize: '0.88rem', color: 'var(--text-primary, #111827)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{supplier.name}</span>
+                        {overLimit && (
+                          <span title={`Credit Limit Exceeded (${formatCurrency(creditLimitVal)})`} style={{ color: '#dc2626', fontSize: '0.75rem', flexShrink: 0 }}>⚠</span>
+                        )}
                       </div>
                       <div style={{ fontWeight: 700, fontSize: '0.85rem', color: hasPending ? '#e11d48' : '#059669', flexShrink: 0 }}>
                         {hasPending ? formatCurrency(stats.pendingPayable) : '₹ 0.00'}
@@ -891,6 +1096,11 @@ export default function SuppliersView({ onNewPurchase }) {
 
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.75rem', color: 'var(--text-secondary, #6b7280)' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                        {supplier.partyGroup && supplier.partyGroup !== 'General' && (
+                          <span style={{ fontSize: '0.66rem', background: '#f3f4f6', color: '#4b5563', padding: '1px 5px', borderRadius: '3px', fontWeight: 600 }}>
+                            {supplier.partyGroup}
+                          </span>
+                        )}
                         {supplier.phone && <span>{supplier.phone}</span>}
                         {supplier.city && <span>• {supplier.city}</span>}
                       </div>
@@ -950,6 +1160,16 @@ export default function SuppliersView({ onNewPurchase }) {
                     <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-primary, #111827)' }}>
                       {activeSupplier.name}
                     </h2>
+                    {activeSupplier.partyGroup && (
+                      <span style={{ background: '#e0e7ff', color: '#4338ca', padding: '2px 8px', borderRadius: '4px', fontSize: '0.72rem', fontWeight: 600 }}>
+                        {activeSupplier.partyGroup}
+                      </span>
+                    )}
+                    {activeSupplier.gstType && (
+                      <span style={{ background: '#f3f4f6', color: '#374151', padding: '2px 8px', borderRadius: '4px', fontSize: '0.72rem', fontWeight: 500 }}>
+                        {activeSupplier.gstType}
+                      </span>
+                    )}
                     {activeSupplier.gstin && (
                       <span style={{ background: '#eff6ff', color: '#1d4ed8', padding: '2px 8px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 600 }}>
                         GSTIN: {activeSupplier.gstin}
@@ -966,7 +1186,34 @@ export default function SuppliersView({ onNewPurchase }) {
                         🏦 {activeSupplier.bankName} (A/C: {activeSupplier.accountNumber || 'N/A'}, IFSC: {activeSupplier.ifscCode || 'N/A'})
                       </span>
                     )}
+                    {activeSupplier.upiId && (
+                      <span style={{ color: '#1d4ed8', fontWeight: 500 }}>
+                        📱 UPI: {activeSupplier.upiId}
+                      </span>
+                    )}
+                    {activeSupplier.creditLimitEnabled && Number(activeSupplier.creditLimit) > 0 && (
+                      <span><strong>Credit Limit:</strong> {formatCurrency(Number(activeSupplier.creditLimit))}</span>
+                    )}
                   </div>
+
+                  {/* Credit Limit Warning Banner */}
+                  {activeSupplier.creditLimitEnabled && Number(activeSupplier.creditLimit) > 0 && activeStats.pendingPayable > Number(activeSupplier.creditLimit) && (
+                    <div style={{
+                      marginTop: '0.5rem',
+                      padding: '0.35rem 0.65rem',
+                      background: '#fef2f2',
+                      border: '1px solid #fecaca',
+                      borderRadius: '6px',
+                      color: '#b91c1c',
+                      fontSize: '0.75rem',
+                      fontWeight: 600,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.35rem'
+                    }}>
+                      <AlertCircle size={13} /> Credit limit of {formatCurrency(Number(activeSupplier.creditLimit))} exceeded by {formatCurrency(activeStats.pendingPayable - Number(activeSupplier.creditLimit))}
+                    </div>
+                  )}
                 </div>
 
                 {/* Vyapar Actions for Active Supplier */}
@@ -1040,14 +1287,14 @@ export default function SuppliersView({ onNewPurchase }) {
                 gap: '0.75rem',
                 padding: '0.85rem 1.25rem',
                 borderBottom: '1px solid var(--border-color, #e5e7eb)',
-                background: '#ffffff'
+                background: 'var(--card-bg, #ffffff)'
               }}>
                 {/* Outstanding Payable */}
                 <div style={{
                   padding: '0.75rem',
                   borderRadius: '8px',
                   border: `1px solid ${activeStats.pendingPayable > 0.01 ? '#fecdd3' : '#e5e7eb'}`,
-                  background: activeStats.pendingPayable > 0.01 ? '#fff1f2' : '#fafafa'
+                  background: activeStats.pendingPayable > 0.01 ? '#fff1f2' : 'var(--bg-secondary, #fafafa)'
                 }}>
                   <div style={{ fontSize: '0.72rem', color: activeStats.pendingPayable > 0.01 ? '#9f1239' : '#6b7280', fontWeight: 600, textTransform: 'uppercase' }}>
                     You'll Pay (Balance Due)
@@ -1061,11 +1308,11 @@ export default function SuppliersView({ onNewPurchase }) {
                 </div>
 
                 {/* Total Purchases */}
-                <div style={{ padding: '0.75rem', borderRadius: '8px', border: '1px solid #e5e7eb', background: '#fafafa' }}>
+                <div style={{ padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border-color, #e5e7eb)', background: 'var(--bg-secondary, #fafafa)' }}>
                   <div style={{ fontSize: '0.72rem', color: '#6b7280', fontWeight: 600, textTransform: 'uppercase' }}>
                     Total Purchases
                   </div>
-                  <div style={{ fontSize: '1.35rem', fontWeight: 700, color: '#111827', marginTop: '2px' }}>
+                  <div style={{ fontSize: '1.35rem', fontWeight: 700, color: 'var(--text-primary, #111827)', marginTop: '2px' }}>
                     {formatCurrency(activeStats.totalPurchases)}
                   </div>
                   <div style={{ fontSize: '0.7rem', color: '#6b7280', marginTop: '2px' }}>
@@ -1074,7 +1321,7 @@ export default function SuppliersView({ onNewPurchase }) {
                 </div>
 
                 {/* Total Amount Paid */}
-                <div style={{ padding: '0.75rem', borderRadius: '8px', border: '1px solid #e5e7eb', background: '#fafafa' }}>
+                <div style={{ padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border-color, #e5e7eb)', background: 'var(--bg-secondary, #fafafa)' }}>
                   <div style={{ fontSize: '0.72rem', color: '#6b7280', fontWeight: 600, textTransform: 'uppercase' }}>
                     Total Paid Out
                   </div>
@@ -1087,30 +1334,94 @@ export default function SuppliersView({ onNewPurchase }) {
                 </div>
               </div>
 
+              {/* Payable Aging Breakdown Strip */}
+              {activeStats.pendingPayable > 0.01 && (() => {
+                const aging = getSupplierAging(activeSupplier);
+                return (
+                  <div style={{
+                    padding: '0.55rem 1.25rem',
+                    borderBottom: '1px solid var(--border-color, #e5e7eb)',
+                    background: '#fffbeb',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '1.25rem',
+                    flexWrap: 'wrap',
+                    fontSize: '0.76rem'
+                  }}>
+                    <span style={{ fontWeight: 700, color: '#92400e', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                      <Clock size={13} /> Payable Aging:
+                    </span>
+                    <span><strong>0–30 Days:</strong> {formatCurrency(aging.b0_30)}</span>
+                    <span><strong>31–60 Days:</strong> {formatCurrency(aging.b31_60)}</span>
+                    <span style={{ color: aging.b61_90 > 0 ? '#d97706' : 'inherit' }}><strong>61–90 Days:</strong> {formatCurrency(aging.b61_90)}</span>
+                    <span style={{ color: aging.b90_plus > 0 ? '#dc2626' : 'inherit', fontWeight: aging.b90_plus > 0 ? 700 : 400 }}>
+                      <strong>90+ Days:</strong> {formatCurrency(aging.b90_plus)}
+                    </span>
+                  </div>
+                );
+              })()}
+
               {/* Supplier Transactions & Dr / Cr Ledger Table */}
               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
                 <div style={{
-                  padding: '0.75rem 1.25rem',
+                  padding: '0.65rem 1.25rem',
                   borderBottom: '1px solid var(--border-color, #e5e7eb)',
                   display: 'flex',
                   justifyContent: 'space-between',
                   alignItems: 'center',
+                  flexWrap: 'wrap',
+                  gap: '0.5rem',
                   background: 'var(--bg-secondary, #fafafa)'
                 }}>
                   <div style={{ fontWeight: 700, fontSize: '0.88rem', color: 'var(--text-primary, #111827)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                     <CreditCard size={16} style={{ color: '#2563eb' }} />
-                    Transactions & Dr / Cr Ledger
+                    Transactions & Dr / Cr Ledger ({filteredSupplierLedger.length})
                   </div>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary, #6b7280)' }}>
-                    Total entries: {activeLedgerTransactions.length}
+
+                  {/* Right-Pane Vyapar Transaction Search & Type Filter */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap' }}>
+                    <select
+                      value={txnTypeFilter}
+                      onChange={(e) => setTxnTypeFilter(e.target.value)}
+                      style={{
+                        padding: '0.3rem 0.55rem',
+                        fontSize: '0.76rem',
+                        borderRadius: '6px',
+                        border: '1px solid var(--border-color, #d1d5db)',
+                        background: 'var(--card-bg, #ffffff)',
+                        color: 'var(--text-primary, #374151)'
+                      }}>
+                      <option value="all">All Types</option>
+                      <option value="PURCHASE_BILL">Purchase Bills</option>
+                      <option value="PAYMENT_OUT">Payment-Out</option>
+                      <option value="DEBIT_NOTE">Debit Notes</option>
+                    </select>
+
+                    <div style={{ position: 'relative' }}>
+                      <Search size={13} style={{ position: 'absolute', left: '8px', top: '50%', transform: 'translateY(-50%)', color: '#9ca3af' }} />
+                      <input
+                        type="text"
+                        placeholder="Filter transactions..."
+                        value={txnSearch}
+                        onChange={(e) => setTxnSearch(e.target.value)}
+                        style={{
+                          padding: '0.3rem 0.6rem 0.3rem 1.65rem',
+                          fontSize: '0.76rem',
+                          borderRadius: '6px',
+                          border: '1px solid var(--border-color, #d1d5db)',
+                          width: '165px',
+                          outline: 'none'
+                        }}
+                      />
+                    </div>
                   </div>
                 </div>
 
                 <div style={{ flex: 1, overflowY: 'auto' }}>
-                  {activeLedgerTransactions.length === 0 ? (
+                  {filteredSupplierLedger.length === 0 ? (
                     <div style={{ textAlign: 'center', padding: '3.5rem 1rem', color: 'var(--text-secondary, #6b7280)' }}>
                       <FileText size={40} style={{ color: '#cbd5e1', marginBottom: '0.75rem' }} />
-                      <div style={{ fontWeight: 600, fontSize: '0.92rem' }}>No transactions recorded for this supplier</div>
+                      <div style={{ fontWeight: 600, fontSize: '0.92rem' }}>No transactions matching filter</div>
                       <div style={{ fontSize: '0.8rem', marginTop: '0.25rem' }}>
                         Record your first purchase bill or payment-out voucher to start tracking this ledger.
                       </div>
@@ -1139,7 +1450,7 @@ export default function SuppliersView({ onNewPurchase }) {
                         </tr>
                       </thead>
                       <tbody>
-                        {activeLedgerTransactions.map((tx) => {
+                        {filteredSupplierLedger.map((tx) => {
                           const isPayment = tx.debit > 0;
                           return (
                             <tr key={tx.id} style={{ borderBottom: '1px solid var(--border-color, #f3f4f6)' }}>
@@ -1392,6 +1703,7 @@ export default function SuppliersView({ onNewPurchase }) {
       {/* 5. MODAL: ADD / EDIT SUPPLIER */}
       {showSupplierModal && (
         <SupplierModal
+          show={showSupplierModal}
           supplier={modalSupplier}
           isEditing={isEditing}
           onSave={handleSaveSupplier}

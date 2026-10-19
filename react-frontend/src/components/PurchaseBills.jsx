@@ -2006,8 +2006,27 @@ export default function PurchaseBills({
             <VyaparInvoiceEditor
               entryType="purchase"
               docType="purchase-bills"
-              editingRecord={editingId ? purchases.find(p => p.id === editingId) : null}
-              onSave={async () => { closeForm(); await loadPurchases(); }}
+              editingRecord={
+                editingId
+                  ? purchases.find(p => p.id === editingId)
+                  : (form.supplierName || form.linkedPoId || form.invoiceNumber ? form : null)
+              }
+              onSave={async () => {
+                if (form.linkedPoId) {
+                  const po = purchaseOrdersList.find(o => String(o.id) === String(form.linkedPoId));
+                  if (po) {
+                    try {
+                      await savePurchase({
+                        ...po,
+                        orderStatus: 'Fulfilled',
+                        note: (po.note ? po.note + ' | ' : '') + `Converted to Purchase Bill`
+                      });
+                    } catch { /* ignore */ }
+                  }
+                }
+                closeForm();
+                await loadPurchases();
+              }}
               onBack={closeForm}
             />
           </div>
