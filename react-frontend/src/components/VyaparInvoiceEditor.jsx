@@ -153,7 +153,7 @@ export default function VyaparInvoiceEditor({
   // Dynamic units list merging default Vyapar units + custom user units
   const unitOptions = useMemo(() => {
     try {
-      const custom = (getAllUnits() || []).map(u => String(u.code || u).toUpperCase());
+      const custom = (getAllUnits() || []).map(u => String(typeof u === 'string' ? u : (u.uqc || u.label || u.code || 'PCS')).toUpperCase());
       return Array.from(new Set([...DEFAULT_UNITS, ...custom]));
     } catch {
       return DEFAULT_UNITS;

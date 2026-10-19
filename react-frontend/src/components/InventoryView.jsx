@@ -129,7 +129,9 @@ export default function InventoryView() {
   const [selectedUnitMaster, setSelectedUnitMaster] = useState(null);
 
   // Settings & Profile
-  const [units, setUnits] = useState(getAllUnits());
+  const [units, setUnits] = useState(() =>
+    (getAllUnits() || []).map(u => typeof u === 'string' ? u : (u.label || u.uqc || u.code || 'Nos'))
+  );
   const [profile, setProfile] = useState(null);
   const [profileCountry, setProfileCountry] = useState('India');
   const [stockAlerts, setStockAlerts] = useState({ enabled: true, threshold: 5 });
@@ -177,7 +179,7 @@ export default function InventoryView() {
 
   useEffect(() => {
     loadData();
-    const baseUnits = getAllUnits() || [];
+    const baseUnits = (getAllUnits() || []).map(u => typeof u === 'string' ? u : (u.label || u.uqc || u.code || 'Nos'));
     const vyaparUnits = ['Kg', 'Gm', 'Nos', 'Pcs', 'Pac', 'Box', 'Bag', 'Btl', 'Ctn', 'Dzn', 'Ltr', 'Ml', 'Qtl', 'Ton', 'Mtr', 'Set'];
     const merged = Array.from(new Set([...vyaparUnits, ...baseUnits]));
     setUnits(merged);
