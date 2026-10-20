@@ -1445,7 +1445,7 @@ export default function ReportsView() {
         <div style={{ padding: '0.85rem', borderBottom: '1px solid var(--border-color, #e5e7eb)', background: 'var(--bg-secondary, #f8fafc)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontWeight: 800, fontSize: '0.92rem', color: 'var(--text-primary)', marginBottom: '0.6rem' }}>
             <FolderOpen size={17} color="#2563eb" />
-            <span>Vyapar Reports Hub</span>
+            <span>Reports Hub</span>
           </div>
           <div className="search-box" style={{ width: '100%' }}>
             <Search size={14} className="search-icon" />
@@ -2055,7 +2055,7 @@ export default function ReportsView() {
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
                 <div>
                   <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700 }}>Trading & Profit & Loss Account</h3>
-                  <p style={{ margin: '2px 0 0', fontSize: '0.76rem', color: 'var(--text-muted)' }}>GAAP / Vyapar Standard Trading Account</p>
+                  <p style={{ margin: '2px 0 0', fontSize: '0.76rem', color: 'var(--text-muted)' }}>GAAP Standard Trading Account</p>
                 </div>
                 <button onClick={exportPLPdf} className="btn btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', padding: '0.4rem 0.8rem', fontSize: '0.8rem', fontWeight: 600 }}>
                   <Download size={14} /> Export P&L PDF

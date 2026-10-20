@@ -806,7 +806,7 @@ export default function BarcodeGeneratorView() {
             </h1>
             <HelpButton topic="barcodes" />
             <span style={{ background: 'rgba(37, 99, 235, 0.1)', color: 'var(--primary)', padding: '2px 8px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 700 }}>
-              Vyapar Desktop Parity
+              Desktop Parity
             </span>
           </div>
           <p className="page-subtitle" style={{ margin: '4px 0 0', color: 'var(--text-muted)' }}>

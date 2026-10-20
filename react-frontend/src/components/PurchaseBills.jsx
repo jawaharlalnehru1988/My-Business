@@ -1409,7 +1409,7 @@ export default function PurchaseBills({
               {activeTab === 'purchase-return' && 'Issue debit notes for returned goods and reverse GST ITC'}
             </p>
           </div>
-          <HelpButton title="Vyapar Purchase Management Suite">
+          <HelpButton title="Purchase Management Suite">
             <ul style={{ paddingLeft: '1.1rem', margin: 0 }}>
               <li><strong>Purchase Bills:</strong> Vendor tax invoices that build Input Tax Credit (ITC) and increment inventory stock.</li>
               <li><strong>Payment-Out:</strong> Direct payments to suppliers (Cash, Bank, UPI, Cheque) with FIFO auto-settlement against bills.</li>
@@ -1856,7 +1856,7 @@ export default function PurchaseBills({
                                     borderColor: '#bfdbfe'
                                   }}
                                   onClick={() => handleConvertToPurchaseBill(po)}
-                                  title="1-Click Convert to Purchase Bill (Vyapar)">
+                                  title="1-Click Convert to Purchase Bill">
                                   ⚡ Convert to Bill
                                 </button>
                               )}

@@ -1395,7 +1395,7 @@ export default function InventoryView() {
                 <div style={{ padding: '1rem 1.25rem', borderBottom: '1px solid var(--border-color, #e5e7eb)', background: 'var(--bg-secondary, #f9fafb)' }}>
                   <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700 }}>Unit: {activeUnitObj?.unit}</h3>
                   <div style={{ fontSize: '0.8rem', color: '#6b7280', marginTop: '4px' }}>
-                    Vyapar Dual-Unit Conversion allows buying in bulk (e.g., <strong>Kg</strong> or <strong>Box</strong>) and selling in retail quantities (e.g., <strong>Gm</strong> or <strong>Pcs</strong>) with automatic price & stock conversion.
+                    Dual-Unit Conversion allows buying in bulk (e.g., <strong>Kg</strong> or <strong>Box</strong>) and selling in retail quantities (e.g., <strong>Gm</strong> or <strong>Pcs</strong>) with automatic price & stock conversion.
                   </div>
                 </div>
                 <div style={{ flex: 1, overflowY: 'auto' }}>
@@ -2454,7 +2454,7 @@ export default function InventoryView() {
                 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.65rem' }}>
                     <span style={{ fontWeight: 700, fontSize: '0.85rem', color: '#1e3a8a', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                      <ArrowRightLeft size={15} /> Select Unit & Conversion Rate (Vyapar Dual-Unit)
+                      <ArrowRightLeft size={15} /> Select Unit & Conversion Rate (Dual-Unit)
                     </span>
                     <button type="button" onClick={() => setShowUnitModal(false)} style={{ border: 'none', background: 'transparent', color: '#1e3a8a', cursor: 'pointer', fontWeight: 700, fontSize: '0.75rem' }}>
                       Done ✓

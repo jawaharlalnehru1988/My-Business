@@ -949,7 +949,7 @@ export default function SuppliersView({ onNewPurchase }) {
                 color: 'var(--text-primary, #374151)',
                 cursor: 'pointer'
               }}
-              title="Filter by Vyapar Party Group">
+              title="Filter by Party Group">
               <option value="all">All Groups</option>
               {partyGroups.map(g => <option key={g} value={g}>{g}</option>)}
             </select>

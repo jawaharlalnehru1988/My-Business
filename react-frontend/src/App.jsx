@@ -929,7 +929,7 @@ function App() {
               <h2 className="sidebar-title" style={{ fontSize: '0.98rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '145px' }}>
                 {profile?.businessName || localStorage.getItem('businessName') || 'My Business'}
               </h2>
-              <p className="sidebar-subtitle">{profile?.gstin || 'Vyapar Edition'}</p>
+              <p className="sidebar-subtitle">{profile?.gstin || 'Business Edition'}</p>
             </div>
           </div>
           <button

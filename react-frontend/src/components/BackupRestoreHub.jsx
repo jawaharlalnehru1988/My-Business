@@ -212,7 +212,7 @@ export default function BackupRestoreHub() {
   const runExportData = async () => {
     try {
       const json = await exportAllData(exportSel);
-      const fileName = `Vyapar-Database-Backup-${new Date().toISOString().slice(0, 10)}.json`;
+      const fileName = `Database-Backup-${new Date().toISOString().slice(0, 10)}.json`;
 
       const blob = new Blob([json], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
@@ -229,7 +229,7 @@ export default function BackupRestoreHub() {
           setDriveSyncing(true);
           const ok = await ensureToken(profile.googleClientId);
           if (ok) {
-            const folderName = (profile.googleDriveFolder || 'Vyapar Invoices') + ' - Backups';
+            const folderName = (profile.googleDriveFolder || 'Business Invoices') + ' - Backups';
             const folderId = await findOrCreateFolder(folderName);
             await uploadJSON(fileName, json, folderId);
             toast('Backup saved directly to Google Drive folder!', 'success');
@@ -257,7 +257,7 @@ export default function BackupRestoreHub() {
       const text = await file.text();
       const inspection = inspectBackup(text);
       if (!inspection.valid) {
-        toast("Selected file is not a valid Vyapar / Accounting backup.", 'error');
+        toast("Selected file is not a valid Accounting backup.", 'error');
         return;
       }
       setImportInspection(inspection);
@@ -349,7 +349,7 @@ export default function BackupRestoreHub() {
             </h1>
             <HelpButton topic="backup" />
             <span style={{ background: 'rgba(16, 185, 129, 0.1)', color: '#059669', padding: '2px 8px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 700 }}>
-              Vyapar Desktop Parity
+              Desktop Parity
             </span>
           </div>
           <p className="page-subtitle" style={{ margin: '4px 0 0', color: 'var(--text-muted)' }}>
@@ -728,7 +728,7 @@ export default function BackupRestoreHub() {
                 </span>
               </div>
               <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                Target Folder: <strong>{profile?.googleDriveFolder || 'Vyapar Invoices'} - Backups</strong>
+                Target Folder: <strong>{profile?.googleDriveFolder || 'Business Invoices'} - Backups</strong>
               </div>
             </div>
 
