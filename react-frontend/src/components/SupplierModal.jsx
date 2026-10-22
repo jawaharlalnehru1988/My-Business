@@ -19,7 +19,7 @@ const GST_STATE_MAP = {
 const PARTY_GROUPS = ['General', 'Raw Material Vendor', 'Wholesale Distributor', 'Manufacturer', 'Logistics / Transport', 'Services'];
 
 export default function SupplierModal({ show = true, onClose, onSave, supplier, isEditing, defaultCountry }) {
-  const fallbackCountry = defaultCountry || detectCountryFromBrowser();
+  const fallbackCountry = defaultCountry || supplier?.country || 'India';
   const todayStr = new Date().toISOString().split('T')[0];
 
   const emptyForm = {
@@ -250,6 +250,25 @@ export default function SupplierModal({ show = true, onClose, onSave, supplier, 
                 maxLength={20}
               />
               {taxIdWarning && <small style={{ color: '#d97706', fontSize: '0.7rem', display: 'block', marginTop: '0.2rem' }}>⚠ {taxIdWarning}</small>}
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Country</label>
+              <select
+                className="form-input"
+                value={form.country || 'India'}
+                onChange={e => setForm(prev => ({ ...prev, country: e.target.value, state: '' }))}
+              >
+                {(() => {
+                  const visible = getCountriesForRegion(getRegionMode());
+                  const out = [];
+                  if (form.country && !visible.some(c => c.name === form.country)) {
+                    out.push(<option key={form.country} value={form.country}>{form.country}</option>);
+                  }
+                  visible.forEach(c => out.push(<option key={c.code} value={c.name}>{c.name}</option>));
+                  return out;
+                })()}
+              </select>
             </div>
 
             <div className="form-group">

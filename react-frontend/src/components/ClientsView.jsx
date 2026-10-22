@@ -1540,7 +1540,7 @@ export default function ClientsView({ onEdit, onDuplicate, onNew }) {
         onSave={handleModalSave}
         client={modalClient}
         isEditing={!!editingClientId}
-        defaultCountry={profileCountry}
+        defaultCountry={profileCountry || profile?.country || 'India'}
       />
     </div>
   );

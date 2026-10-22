@@ -494,7 +494,7 @@ export default function SettingsView({ onSaved }) {
 
   const handleAddNewProfile = () => {
     setProfile({
-      businessName: '', address: '', city: '', state: '', pin: '', country: detectCountryFromBrowser(),
+      businessName: '', address: '', city: '', state: '', pin: '', country: 'India',
       gstin: '', pan: '', email: '', phone: '', bankName: '', accountNumber: '', ifsc: '', swift: '',
       logo: '', logoHeight: 48, signature: '', upiId: '', googleClientId: '', googleDriveFolder: 'GST Billing Invoices',
     });

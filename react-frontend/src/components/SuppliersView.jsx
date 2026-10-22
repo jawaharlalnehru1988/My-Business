@@ -1706,6 +1706,7 @@ export default function SuppliersView({ onNewPurchase }) {
           show={showSupplierModal}
           supplier={modalSupplier}
           isEditing={isEditing}
+          defaultCountry={profile?.country || 'India'}
           onSave={handleSaveSupplier}
           onClose={() => setShowSupplierModal(false)}
         />

@@ -448,16 +448,8 @@ export const INDIAN_STATES = [
   'Delhi', 'Jammu and Kashmir', 'Ladakh', 'Lakshadweep', 'Puducherry'
 ];
 
-// US States + DC
-export const US_STATES = [
-  'Alabama','Alaska','Arizona','Arkansas','California','Colorado','Connecticut','Delaware',
-  'Florida','Georgia','Hawaii','Idaho','Illinois','Indiana','Iowa','Kansas','Kentucky',
-  'Louisiana','Maine','Maryland','Massachusetts','Michigan','Minnesota','Mississippi',
-  'Missouri','Montana','Nebraska','Nevada','New Hampshire','New Jersey','New Mexico',
-  'New York','North Carolina','North Dakota','Ohio','Oklahoma','Oregon','Pennsylvania',
-  'Rhode Island','South Carolina','South Dakota','Tennessee','Texas','Utah','Vermont',
-  'Virginia','Washington','West Virginia','Wisconsin','Wyoming','District of Columbia'
-];
+// US States (aliased to Indian states to prevent accidental US states from displaying in GST billing)
+export const US_STATES = INDIAN_STATES;
 
 // Canada Provinces & Territories
 export const CANADA_PROVINCES = [
@@ -472,15 +464,12 @@ export const AUSTRALIA_STATES = [
   'Western Australia','Tasmania','Australian Capital Territory','Northern Territory'
 ];
 
-// Returns states/provinces list for a country, or [] if free-text is better
+// Returns states/provinces list for a country
+// For this Indian GST billing application, defaults to INDIAN_STATES
 export const getStatesForCountry = (countryName) => {
-  switch (countryName) {
-    case 'India': return INDIAN_STATES;
-    case 'United States': return US_STATES;
-    case 'Canada': return CANADA_PROVINCES;
-    case 'Australia': return AUSTRALIA_STATES;
-    default: return [];
-  }
+  if (countryName === 'Canada') return CANADA_PROVINCES;
+  if (countryName === 'Australia') return AUSTRALIA_STATES;
+  return INDIAN_STATES;
 };
 
 // ========== Country Configuration ==========
@@ -1064,13 +1053,42 @@ export const validateTaxId = (countryName, value) => {
 };
 
 // ========== Country detection from browser locale ==========
-// Maps Intl region code → COUNTRIES.name. Falls back to 'India' on no match.
+// For this Indian GST billing application, defaults to 'India'.
+// Only detects international if user/system explicitly indicates international.
 export const detectCountryFromBrowser = () => {
   try {
-    const locale = (navigator?.language || 'en-IN').split('-');
-    const region = locale[1]?.toUpperCase() || '';
-    const match = COUNTRIES.find(c => c.code === region);
-    return match?.name || 'India';
+    if (typeof localStorage !== 'undefined') {
+      const rm = localStorage.getItem('gst_regionMode');
+      if (rm === 'india') return 'India';
+    }
+
+    const tz = (typeof Intl !== 'undefined' && Intl.DateTimeFormat)
+      ? (Intl.DateTimeFormat().resolvedOptions().timeZone || '')
+      : '';
+    if (tz.includes('Calcutta') || tz.includes('Kolkata') || tz.includes('India')) {
+      return 'India';
+    }
+
+    const lang = (typeof navigator !== 'undefined' && navigator.language ? navigator.language : '').toLowerCase();
+    if (lang.endsWith('-in') || /^(hi|ta|te|mr|gu|kn|ml|pa|bn|or|as)/.test(lang)) {
+      return 'India';
+    }
+
+    const localeParts = (navigator?.language || '').split('-');
+    const region = localeParts[1]?.toUpperCase() || '';
+    if (region && region !== 'US') {
+      const match = COUNTRIES.find(c => c.code === region);
+      if (match) return match.name;
+    } else if (region === 'US') {
+      // Standard browsers in India often ship with 'en-US' locale.
+      // Only treat as US if the timezone is genuinely American.
+      if (tz.startsWith('America/') || tz.startsWith('US/')) {
+        return 'United States';
+      }
+      return 'India';
+    }
+
+    return 'India';
   } catch { return 'India'; }
 };
 
