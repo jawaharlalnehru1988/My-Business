@@ -1442,16 +1442,144 @@ function App() {
       <div className="main-content">
         {/* Top Navigation Bar */}
         <header className="top-navbar">
-          <div className="top-navbar-left">
-            <button
-              type="button"
-              className="mobile-menu-toggle-btn"
-              onClick={() => setMobileSidebarOpen(v => !v)}
-              title={mobileSidebarOpen ? "Close menu" : "Open menu"}
-              aria-label="Toggle navigation menu"
-            >
-              <Menu size={20} />
-            </button>
+          {/* Upper Row: Company Profile on left, User Actions on right */}
+          <div className="top-navbar-upper">
+            <div className="top-navbar-left">
+              <button
+                type="button"
+                className="mobile-menu-toggle-btn"
+                onClick={() => setMobileSidebarOpen(v => !v)}
+                title={mobileSidebarOpen ? "Close menu" : "Open menu"}
+                aria-label="Toggle navigation menu"
+              >
+                <Menu size={20} />
+              </button>
+
+              {/* Active Business Profile Chip & Multi-Company Switcher */}
+              <button
+                type="button"
+                className="navbar-business-chip"
+                onClick={() => setShowCompanyModal(true)}
+                title="Switch Active Company / Sister Firm"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.55rem',
+                  cursor: 'pointer',
+                  border: '1.5px solid rgba(37, 99, 235, 0.35)',
+                  background: 'rgba(37, 99, 235, 0.08)',
+                  borderRadius: '20px',
+                  padding: '0.35rem 0.85rem',
+                  transition: 'all 0.15s ease',
+                  flexShrink: 0,
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                <Building2 size={16} style={{ color: 'var(--primary, #2563eb)', flexShrink: 0 }} />
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', textAlign: 'left', lineHeight: 1.15, whiteSpace: 'nowrap' }}>
+                  <span className="business-chip-name" style={{ fontSize: '0.84rem', fontWeight: 700, color: 'var(--text-primary, #0f172a)', whiteSpace: 'nowrap' }}>
+                    {profile?.businessName || allProfiles?.[0]?.businessName || 'My Business'}
+                  </span>
+                  {profile?.gstin ? (
+                    <span style={{ fontSize: '0.68rem', color: 'var(--text-muted, #64748b)', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                      GSTIN: {profile.gstin}
+                    </span>
+                  ) : (
+                    <span style={{ fontSize: '0.68rem', color: 'var(--text-muted, #94a3b8)', whiteSpace: 'nowrap' }}>
+                      Multi-Company
+                    </span>
+                  )}
+                </div>
+                <ChevronDown size={14} style={{ opacity: 0.7, marginLeft: '2px', color: 'var(--primary, #2563eb)', flexShrink: 0 }} />
+              </button>
+            </div>
+
+            <div className="top-navbar-right">
+              {/* Accounting Partners Button */}
+              <button
+                type="button"
+                onClick={() => setShowPartnerModal(true)}
+                className="navbar-partner-btn"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  fontSize: '0.82rem',
+                  fontWeight: 600,
+                  padding: '0.35rem 0.85rem',
+                  borderRadius: '20px',
+                  border: '1.5px solid rgba(16, 185, 129, 0.35)',
+                  background: 'rgba(16, 185, 129, 0.08)',
+                  color: '#059669',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                  flexShrink: 0,
+                  whiteSpace: 'nowrap'
+                }}
+                title="Manage Accounting Partners & Collaborations"
+              >
+                <Users size={15} style={{ flexShrink: 0 }} />
+                <span style={{ whiteSpace: 'nowrap' }}>Partners</span>
+              </button>
+
+              {/* Light / Dark Mode Switcher in Top Header */}
+              <button
+                type="button"
+                className="navbar-theme-toggle"
+                onClick={() => setDarkMode(prev => !prev)}
+                title={darkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+                aria-label={darkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  fontSize: '0.82rem',
+                  fontWeight: 600,
+                  padding: '0.35rem 0.75rem',
+                  borderRadius: '20px',
+                  border: darkMode ? '1.5px solid rgba(245, 158, 11, 0.45)' : '1.5px solid rgba(99, 102, 241, 0.35)',
+                  background: darkMode ? 'rgba(245, 158, 11, 0.12)' : 'rgba(99, 102, 241, 0.08)',
+                  color: darkMode ? '#f59e0b' : '#4f46e5',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  flexShrink: 0,
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                {darkMode ? (
+                  <>
+                    <Sun size={15} style={{ color: '#f59e0b', flexShrink: 0 }} />
+                    <span style={{ whiteSpace: 'nowrap' }}>Light</span>
+                  </>
+                ) : (
+                  <>
+                    <Moon size={15} style={{ color: '#4f46e5', flexShrink: 0 }} />
+                    <span style={{ whiteSpace: 'nowrap' }}>Dark</span>
+                  </>
+                )}
+              </button>
+
+              {/* Logged-In User Profile Chip */}
+              <div className="navbar-user-chip" title={`Logged in as ${currentUserEmail || resolveUserEmail() || 'User'}`} style={{ flexShrink: 0, whiteSpace: 'nowrap' }}>
+                <div className="user-avatar" style={{ flexShrink: 0 }}>
+                  <User size={15} />
+                </div>
+                <div className="user-info" style={{ whiteSpace: 'nowrap' }}>
+                  <span className="user-email" style={{ whiteSpace: 'nowrap' }}>{currentUserEmail || resolveUserEmail() || 'User'}</span>
+                  <span className="user-role" style={{ whiteSpace: 'nowrap' }}>Administrator</span>
+                </div>
+              </div>
+
+              {/* Logout Action Button */}
+              <button className="navbar-logout-btn" onClick={handleLogout} title="Log out of account" style={{ flexShrink: 0, whiteSpace: 'nowrap' }}>
+                <LogOut size={15} style={{ flexShrink: 0 }} />
+                <span style={{ whiteSpace: 'nowrap' }}>Logout</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Lower Row: Wrapped Down Full-Width Search Bar */}
+          <div className="top-navbar-search-row">
             <button
               className="navbar-search-btn"
               onClick={() => setShowPalette(true)}
@@ -1460,127 +1588,6 @@ function App() {
               <Search size={15} />
               <span>Search invoices, clients, products...</span>
               <kbd className="search-kbd">Ctrl K</kbd>
-            </button>
-          </div>
-
-          <div className="top-navbar-right">
-            {/* Active Business Profile Chip & Multi-Company Switcher */}
-            <button
-              type="button"
-              className="navbar-business-chip"
-              onClick={() => setShowCompanyModal(true)}
-              title="Switch Active Company / Sister Firm"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.55rem',
-                cursor: 'pointer',
-                border: '1.5px solid rgba(37, 99, 235, 0.35)',
-                background: 'rgba(37, 99, 235, 0.08)',
-                borderRadius: '20px',
-                padding: '0.35rem 0.85rem',
-                transition: 'all 0.15s ease',
-                flexShrink: 0,
-                whiteSpace: 'nowrap'
-              }}
-            >
-              <Building2 size={16} style={{ color: 'var(--primary, #2563eb)', flexShrink: 0 }} />
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', textAlign: 'left', lineHeight: 1.15, whiteSpace: 'nowrap' }}>
-                <span className="business-chip-name" style={{ fontSize: '0.84rem', fontWeight: 700, color: 'var(--text-primary, #0f172a)', whiteSpace: 'nowrap' }}>
-                  {profile?.businessName || allProfiles?.[0]?.businessName || 'My Business'}
-                </span>
-                {profile?.gstin ? (
-                  <span style={{ fontSize: '0.68rem', color: 'var(--text-muted, #64748b)', fontWeight: 600, whiteSpace: 'nowrap' }}>
-                    GSTIN: {profile.gstin}
-                  </span>
-                ) : (
-                  <span style={{ fontSize: '0.68rem', color: 'var(--text-muted, #94a3b8)', whiteSpace: 'nowrap' }}>
-                    Multi-Company
-                  </span>
-                )}
-              </div>
-              <ChevronDown size={14} style={{ opacity: 0.7, marginLeft: '2px', color: 'var(--primary, #2563eb)', flexShrink: 0 }} />
-            </button>
-
-            {/* Accounting Partners Button */}
-            <button
-              type="button"
-              onClick={() => setShowPartnerModal(true)}
-              className="navbar-partner-btn"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px',
-                fontSize: '0.82rem',
-                fontWeight: 600,
-                padding: '0.35rem 0.85rem',
-                borderRadius: '20px',
-                border: '1.5px solid rgba(16, 185, 129, 0.35)',
-                background: 'rgba(16, 185, 129, 0.08)',
-                color: '#059669',
-                cursor: 'pointer',
-                transition: 'all 0.15s ease',
-                flexShrink: 0,
-                whiteSpace: 'nowrap'
-              }}
-              title="Manage Accounting Partners & Collaborations"
-            >
-              <Users size={15} style={{ flexShrink: 0 }} />
-              <span style={{ whiteSpace: 'nowrap' }}>Partners</span>
-            </button>
-
-            {/* Light / Dark Mode Switcher in Top Header */}
-            <button
-              type="button"
-              className="navbar-theme-toggle"
-              onClick={() => setDarkMode(prev => !prev)}
-              title={darkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
-              aria-label={darkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px',
-                fontSize: '0.82rem',
-                fontWeight: 600,
-                padding: '0.35rem 0.75rem',
-                borderRadius: '20px',
-                border: darkMode ? '1.5px solid rgba(245, 158, 11, 0.45)' : '1.5px solid rgba(99, 102, 241, 0.35)',
-                background: darkMode ? 'rgba(245, 158, 11, 0.12)' : 'rgba(99, 102, 241, 0.08)',
-                color: darkMode ? '#f59e0b' : '#4f46e5',
-                cursor: 'pointer',
-                transition: 'all 0.2s ease',
-                flexShrink: 0,
-                whiteSpace: 'nowrap'
-              }}
-            >
-              {darkMode ? (
-                <>
-                  <Sun size={15} style={{ color: '#f59e0b', flexShrink: 0 }} />
-                  <span style={{ whiteSpace: 'nowrap' }}>Light</span>
-                </>
-              ) : (
-                <>
-                  <Moon size={15} style={{ color: '#4f46e5', flexShrink: 0 }} />
-                  <span style={{ whiteSpace: 'nowrap' }}>Dark</span>
-                </>
-              )}
-            </button>
-
-            {/* Logged-In User Profile Chip */}
-            <div className="navbar-user-chip" title={`Logged in as ${currentUserEmail || resolveUserEmail() || 'User'}`} style={{ flexShrink: 0, whiteSpace: 'nowrap' }}>
-              <div className="user-avatar" style={{ flexShrink: 0 }}>
-                <User size={15} />
-              </div>
-              <div className="user-info" style={{ whiteSpace: 'nowrap' }}>
-                <span className="user-email" style={{ whiteSpace: 'nowrap' }}>{currentUserEmail || resolveUserEmail() || 'User'}</span>
-                <span className="user-role" style={{ whiteSpace: 'nowrap' }}>Administrator</span>
-              </div>
-            </div>
-
-            {/* Logout Action Button */}
-            <button className="navbar-logout-btn" onClick={handleLogout} title="Log out of account" style={{ flexShrink: 0, whiteSpace: 'nowrap' }}>
-              <LogOut size={15} style={{ flexShrink: 0 }} />
-              <span style={{ whiteSpace: 'nowrap' }}>Logout</span>
             </button>
           </div>
         </header>

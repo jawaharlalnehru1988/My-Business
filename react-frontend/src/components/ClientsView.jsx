@@ -1163,7 +1163,7 @@ export default function ClientsView({ onEdit, onDuplicate, onNew }) {
                     style={{ background: '#059669', borderColor: '#059669', fontWeight: 700, padding: '0.45rem 1rem' }}
                     title="Record payment collected from this party"
                   >
-                    <Receipt size={16} /> + Record Payment-In
+                    <Receipt size={16} /> Record Payment-In
                   </button>
 
                   <button
@@ -1213,7 +1213,7 @@ export default function ClientsView({ onEdit, onDuplicate, onNew }) {
                     style={{ fontWeight: 600, padding: '0.45rem 0.9rem' }}
                     title="Create new invoice for this party"
                   >
-                    <FileText size={15} /> + Add Sale
+                    <FileText size={15} /> Add Sale
                   </button>
 
                   <div style={{ marginLeft: 'auto', display: 'flex', gap: '0.4rem' }}>

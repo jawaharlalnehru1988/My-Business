@@ -494,7 +494,7 @@ export default function SaleInvoicesView({ docType = 'tax-invoice', onNew, onEdi
               background: activeConfig.accent,
               borderColor: activeConfig.accent
             }}>
-            <Plus size={16} /> + Create {activeConfig.singular}
+            <Plus size={16} /> Create {activeConfig.singular}
           </button>
         </div>
       </div>

@@ -210,8 +210,17 @@ export const getNextInvoiceNumber = async (prefix = 'INV', { peek = false, expli
 // message that the UI can show as "Invoice number already exists".
 export const saveBill = async (bill, { overwrite = false } = {}) => {
   const qs = overwrite ? '?overwrite=1' : '';
+  const safeBill = { ...bill };
+  if (safeBill.id !== undefined && safeBill.id !== null) {
+    const numId = Number(safeBill.id);
+    if (!isNaN(numId) && numId > 0) {
+      safeBill.id = numId;
+    } else {
+      delete safeBill.id;
+    }
+  }
   const payload = {
-    ...bill,
+    ...safeBill,
     type: bill.invoiceType || bill.type || 'tax-invoice',
     options: {
       ...(bill.options || {}),

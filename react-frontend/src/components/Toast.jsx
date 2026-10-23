@@ -24,6 +24,11 @@ export function toast(message, type = 'info', duration = 3500) {
   }
 }
 
+toast.success = (message, duration = 3500) => toast(message, 'success', duration);
+toast.error = (message, duration = 3500) => toast(message, 'error', duration);
+toast.warning = (message, duration = 3500) => toast(message, 'warning', duration);
+toast.info = (message, duration = 3500) => toast(message, 'info', duration);
+
 export default function ToastContainer() {
   const [toasts, setToasts] = useState([]);
 

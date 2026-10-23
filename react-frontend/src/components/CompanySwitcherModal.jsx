@@ -519,7 +519,7 @@ export default function CompanySwitcherModal({
                 borderStyle: 'dashed'
               }}
             >
-              <Plus size={16} /> + Add Another Company / Sister Firm
+              <Plus size={16} /> Add Another Company / Sister Firm
             </button>
           )}
 

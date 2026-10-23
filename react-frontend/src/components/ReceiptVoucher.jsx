@@ -1561,7 +1561,7 @@ export default function ReceiptVoucher({ autoOpenNew }) {
             onClick={openAddAccount}
             className="btn btn-secondary"
             style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', padding: '0.4rem 0.8rem', fontSize: '0.8rem', fontWeight: 600 }}>
-            <Plus size={14} /> + Add Bank
+            <Plus size={14} /> Add Bank
           </button>
 
           <button
@@ -1576,7 +1576,7 @@ export default function ReceiptVoucher({ autoOpenNew }) {
               fontWeight: 600,
               background: '#2563eb'
             }}>
-            <Plus size={15} /> + Payment-In
+            <Plus size={15} /> Payment-In
           </button>
         </div>
       </div>
@@ -1658,7 +1658,7 @@ export default function ReceiptVoucher({ autoOpenNew }) {
 
             <div style={{ padding: '0.75rem', borderTop: '1px solid var(--border-color, #e5e7eb)', background: 'var(--bg-secondary, #f9fafb)' }}>
               <button onClick={openAddAccount} className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', fontSize: '0.82rem' }}>
-                <Plus size={15} /> + Add New Bank Account
+                <Plus size={15} /> Add New Bank Account
               </button>
             </div>
           </div>
@@ -2192,7 +2192,7 @@ export default function ReceiptVoucher({ autoOpenNew }) {
                     <div style={{ fontWeight: 600, fontSize: '1rem' }}>Track Business Loans, OD & CC Accounts</div>
                     <div style={{ fontSize: '0.83rem', marginTop: '0.25rem' }}>Add a Loan Account to track principal balance, EMI payments, and interest expenses.</div>
                     <button onClick={() => { setLoanForm({ ...emptyLoanForm }); setShowLoanModal(true); }} className="btn btn-primary" style={{ marginTop: '1rem' }}>
-                      <Plus size={15} /> + Add Loan Account
+                      <Plus size={15} /> Add Loan Account
                     </button>
                   </div>
                 );

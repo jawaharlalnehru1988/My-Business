@@ -894,7 +894,7 @@ export default function BarcodeGeneratorView() {
                   onClick={handleAddLowStockItems}
                   title="Import items with stock at or below reorder level"
                 >
-                  <AlertCircle size={14} style={{ color: '#eab308' }} /> + Low Stock Items
+                  <AlertCircle size={14} style={{ color: '#eab308' }} /> Low Stock Items
                 </button>
                 <button
                   type="button"
@@ -903,7 +903,7 @@ export default function BarcodeGeneratorView() {
                   onClick={handleAddAllInventory}
                   title="Add all active items from stock catalog"
                 >
-                  <Layers size={14} /> + All Inventory Items
+                  <Layers size={14} /> All Inventory Items
                 </button>
               </div>
             </div>

@@ -1051,7 +1051,7 @@ export default function VyaparInvoiceEditor({
           docType: currentDocType,
           items: validItems.map(i => ({
             productId: i.productId || undefined,
-            name: i.name.trim(),
+            name: (i.name || '').trim(),
             hsn: (i.hsn || '').trim(),
             quantity: Number(i.quantity) || 1,
             freeQty: Number(i.freeQty) || 0,
@@ -1096,8 +1096,17 @@ export default function VyaparInvoiceEditor({
           : (isFullyPaid ? 'paid' : (isPartiallyPaid ? 'partial' : 'unpaid'));
         const finalInvNo = invoiceNumber.trim() || `INV-${Date.now().toString().slice(-4)}`;
 
+        const matchedClient = allParties.find(p => (p.name || '').trim().toLowerCase() === partyName.trim().toLowerCase());
+        const resolvedClientId = editingRecord?.clientId
+          ? Number(editingRecord.clientId)
+          : (matchedClient?.id && !isNaN(Number(matchedClient.id)) ? Number(matchedClient.id) : undefined);
+        const validRecordId = (editingRecord?.id && !isNaN(Number(editingRecord.id)) && Number(editingRecord.id) > 0)
+          ? Number(editingRecord.id)
+          : undefined;
+
         const salePayload = {
-          id: editingRecord?.id || finalInvNo,
+          id: validRecordId,
+          clientId: resolvedClientId,
           invoiceNumber: finalInvNo,
           clientName: partyName.trim(),
           clientPhone: partyPhone.trim(),
@@ -1128,7 +1137,7 @@ export default function VyaparInvoiceEditor({
           terms: termsText.trim(),
           items: validItems.map(i => ({
             productId: i.productId || undefined,
-            name: i.name.trim(),
+            name: (i.name || '').trim(),
             hsn: (i.hsn || '').trim(),
             quantity: Number(i.quantity) || 1,
             freeQty: Number(i.freeQty) || 0,
@@ -1201,8 +1210,11 @@ export default function VyaparInvoiceEditor({
         return;
       }
 
-      if (onSave) onSave();
-      if (onBack) onBack();
+      if (onSave) {
+        onSave();
+      } else if (onBack) {
+        onBack();
+      }
     } catch (err) {
       console.error('Failed to save record:', err);
       toast.error('Failed to save: ' + (err.message || 'Unknown error'));

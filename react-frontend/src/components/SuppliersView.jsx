@@ -979,7 +979,7 @@ export default function SuppliersView({ onNewPurchase }) {
               onClick={onNewPurchase}
               className="btn btn-secondary"
               style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', padding: '0.45rem 0.8rem', fontSize: '0.82rem' }}>
-              <Plus size={15} /> + Add Purchase Bill
+              <Plus size={15} /> Add Purchase Bill
             </button>
           )}
 
@@ -995,7 +995,7 @@ export default function SuppliersView({ onNewPurchase }) {
               fontWeight: 600,
               background: '#2563eb'
             }}>
-            <Plus size={16} /> + Add New Supplier
+            <Plus size={16} /> Add New Supplier
           </button>
         </div>
       </div>
@@ -1233,7 +1233,7 @@ export default function SuppliersView({ onNewPurchase }) {
                       boxShadow: '0 1px 3px rgba(5,150,105,0.2)'
                     }}
                     title="Record money paid to this vendor">
-                    <ArrowDownLeft size={16} /> + Record Payment-Out
+                    <ArrowDownLeft size={16} /> Record Payment-Out
                   </button>
 
                   {onNewPurchase && (
@@ -1242,7 +1242,7 @@ export default function SuppliersView({ onNewPurchase }) {
                       className="btn btn-secondary"
                       style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', padding: '0.45rem 0.8rem', fontSize: '0.82rem' }}
                       title="Add a purchase bill for this vendor">
-                      <Plus size={15} /> + Add Bill
+                      <Plus size={15} /> Add Bill
                     </button>
                   )}
 
@@ -1428,11 +1428,11 @@ export default function SuppliersView({ onNewPurchase }) {
                       <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center', marginTop: '1rem' }}>
                         {onNewPurchase && (
                           <button onClick={onNewPurchase} className="btn btn-secondary" style={{ fontSize: '0.82rem' }}>
-                            <Plus size={14} /> + Record Purchase Bill
+                            <Plus size={14} /> Record Purchase Bill
                           </button>
                         )}
                         <button onClick={openRecordPaymentOut} className="btn btn-primary" style={{ fontSize: '0.82rem', background: '#059669', borderColor: '#059669' }}>
-                          <ArrowDownLeft size={14} /> + Record Payment-Out
+                          <ArrowDownLeft size={14} /> Record Payment-Out
                         </button>
                       </div>
                     </div>

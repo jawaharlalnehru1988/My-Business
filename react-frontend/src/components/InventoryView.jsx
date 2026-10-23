@@ -85,6 +85,18 @@ const ADJUSTMENT_REASONS = [
   'Other'
 ];
 
+function formatPriceValue(val) {
+  if (val === '' || val === null || val === undefined) return '';
+  const num = parseFloat(val);
+  return isNaN(num) ? '' : num.toFixed(2);
+}
+
+function isDiscreteUnit(unitStr) {
+  if (!unitStr) return false;
+  const u = String(unitStr).replace(/\s*\((Base|Sec)\)$/i, '').trim().toLowerCase();
+  return /^(pcs|pc|piece|pieces|nos|no|number|numbers|pac|pack|packs|box|boxes|bag|bags|btl|bottle|bottles|ctn|carton|cartons|set|sets|pair|pairs|roll|rolls|can|cans|unit|units)$/i.test(u);
+}
+
 export default function InventoryView() {
   const [products, setProducts] = useState([]);
   const [bills, setBills] = useState([]);
@@ -464,6 +476,8 @@ export default function InventoryView() {
         const isAdd = adj.type === 'ADD';
         const qty = Number(adj.quantity) || 0;
         const rate = Number(adj.atPrice ?? selectedProduct.purchasePrice ?? selectedProduct.rate ?? 0);
+        const isUnitDiscrete = isDiscreteUnit(adj.displayUnit || baseUnit);
+        const formattedAdjQty = isUnitDiscrete ? Math.round(adj.rawQuantity ?? qty) : (adj.rawQuantity ?? qty);
         txns.push({
           id: adj.id,
           type: 'ADJUSTMENT',
@@ -472,7 +486,7 @@ export default function InventoryView() {
           refNo: adj.reason || 'Manual Adjustment',
           partyName: adj.remarks ? `Note: ${adj.remarks}` : adj.reason,
           qtyChange: isAdd ? +qty : -qty,
-          displayQty: `${isAdd ? '+' : '-'} ${qty} ${adj.displayUnit || baseUnit}`,
+          displayQty: `${isAdd ? '+' : '-'} ${formattedAdjQty} ${adj.displayUnit || baseUnit}`,
           rate: rate,
           amount: qty * rate,
           status: 'Recorded'
@@ -526,20 +540,34 @@ export default function InventoryView() {
     setShowForm(true);
   };
 
+  const handlePriceFieldChange = (field, rawVal) => {
+    const cleanVal = String(rawVal).replace(/[^0-9.]/g, '');
+    const parts = cleanVal.split('.');
+    const sanitized = parts.length > 2 ? parts[0] + '.' + parts.slice(1).join('') : cleanVal;
+    setForm(prev => ({ ...prev, [field]: sanitized }));
+  };
+
+  const handlePriceFieldBlur = (field) => {
+    setForm(prev => {
+      const formatted = formatPriceValue(prev[field]);
+      return { ...prev, [field]: formatted };
+    });
+  };
+
   const openEdit = (product) => {
     setForm({
       name: product.name || '',
       sku: product.sku || product.barcode || '',
       category: product.category || '',
       hsn: product.hsn || '',
-      purchasePrice: product.purchasePrice != null ? String(product.purchasePrice) : '',
+      purchasePrice: product.purchasePrice != null && product.purchasePrice !== '' ? Number(product.purchasePrice).toFixed(2) : '',
       purchasePriceTaxType: product.purchasePriceTaxType || 'without_tax',
-      sellingPrice: product.sellingPrice != null ? String(product.sellingPrice) : (product.rate != null ? String(product.rate) : ''),
+      sellingPrice: product.sellingPrice != null && product.sellingPrice !== '' ? Number(product.sellingPrice).toFixed(2) : (product.rate != null && product.rate !== '' ? Number(product.rate).toFixed(2) : ''),
       salePriceTaxType: product.salePriceTaxType || 'without_tax',
-      wholesalePrice: product.wholesalePrice != null ? String(product.wholesalePrice) : '',
+      wholesalePrice: product.wholesalePrice != null && product.wholesalePrice !== '' ? Number(product.wholesalePrice).toFixed(2) : '',
       wholesalePriceTaxType: product.wholesalePriceTaxType || 'without_tax',
       minWholesaleQty: product.minWholesaleQty != null ? String(product.minWholesaleQty) : '',
-      mrp: product.mrp != null ? String(product.mrp) : '',
+      mrp: product.mrp != null && product.mrp !== '' ? Number(product.mrp).toFixed(2) : '',
       taxPercent: product.taxPercent != null ? String(product.taxPercent) : '18',
       cessPercent: product.cessPercent != null ? String(product.cessPercent) : '0',
       unit: product.unit || 'Kg',
@@ -547,7 +575,7 @@ export default function InventoryView() {
       conversionRate: product.conversionRate != null ? String(product.conversionRate) : '',
       stock: product.stock != null ? String(product.stock) : '0',
       openingStock: product.openingStock != null ? String(product.openingStock) : (product.stock != null ? String(product.stock) : '0'),
-      openingStockPrice: product.openingStockPrice != null ? String(product.openingStockPrice) : (product.purchasePrice != null ? String(product.purchasePrice) : ''),
+      openingStockPrice: product.openingStockPrice != null && product.openingStockPrice !== '' ? Number(product.openingStockPrice).toFixed(2) : (product.purchasePrice != null && product.purchasePrice !== '' ? Number(product.purchasePrice).toFixed(2) : ''),
       openingStockDate: product.openingStockDate || new Date().toISOString().split('T')[0],
       minStock: product.minStock != null ? String(product.minStock) : String(stockAlerts.threshold ?? 5),
       location: product.location || '',
@@ -644,7 +672,8 @@ export default function InventoryView() {
     setAdjType('ADD');
     setAdjQty('');
     setAdjUnit(selectedProduct.unit || 'Kg');
-    setAdjAtPrice(String(selectedProduct.purchasePrice || selectedProduct.rate || 0));
+    const initialPrice = Number(selectedProduct.purchasePrice || selectedProduct.rate || 0);
+    setAdjAtPrice(initialPrice > 0 ? initialPrice.toFixed(2) : '0.00');
     setAdjReason(ADJUSTMENT_REASONS[0]);
     setAdjDate(new Date().toISOString().split('T')[0]);
     setAdjRemarks('');
@@ -665,11 +694,17 @@ export default function InventoryView() {
       const isSecUnit = selectedProduct.secondaryUnit &&
         Number(selectedProduct.conversionRate) > 0 &&
         adjUnit === selectedProduct.secondaryUnit;
+      const isDiscrete = isDiscreteUnit(adjUnit);
+      const cleanRawQty = isDiscrete ? Math.round(rawQty) : rawQty;
       const qtyInBaseUnit = isSecUnit
-        ? rawQty / Number(selectedProduct.conversionRate)
-        : rawQty;
+        ? cleanRawQty / Number(selectedProduct.conversionRate)
+        : cleanRawQty;
 
-      const newStock = Math.round((isAdd ? (currentStock + qtyInBaseUnit) : Math.max(0, currentStock - qtyInBaseUnit)) * 1000) / 1000;
+      const isBaseDiscrete = isDiscreteUnit(selectedProduct.unit);
+      const calcStock = isAdd ? (currentStock + qtyInBaseUnit) : Math.max(0, currentStock - qtyInBaseUnit);
+      const newStock = isBaseDiscrete
+        ? Math.round(calcStock)
+        : Math.round(calcStock * 1000) / 1000;
 
       // 1. Update Product in store
       const updatedProduct = {
@@ -686,7 +721,7 @@ export default function InventoryView() {
         sku: selectedProduct.sku,
         type: adjType,
         quantity: qtyInBaseUnit,
-        rawQuantity: rawQty,
+        rawQuantity: cleanRawQty,
         displayUnit: adjUnit || selectedProduct.unit || 'Kg',
         atPrice: parseFloat(adjAtPrice) || Number(selectedProduct.purchasePrice || 0),
         previousStock: currentStock,
@@ -703,7 +738,8 @@ export default function InventoryView() {
 
       setProducts(prev => prev.map(p => p.id === selectedProduct.id ? updatedProduct : p));
 
-      toast(`Stock adjusted! New stock: ${newStock} ${selectedProduct.unit || 'Kg'}`, 'success');
+      const displayNewStock = isBaseDiscrete ? Math.round(newStock) : newStock;
+      toast(`Stock adjusted! New stock: ${displayNewStock} ${selectedProduct.unit || 'Kg'}`, 'success');
       setShowAdjustModal(false);
     } catch {
       toast('Failed to record stock adjustment', 'error');
@@ -1036,7 +1072,7 @@ export default function InventoryView() {
               color: '#ffffff',
               boxShadow: '0 2px 4px rgba(245,158,11,0.25)'
             }}>
-            <Plus size={16} /> + Add {hubTab === 'SERVICES' ? 'Service' : 'Item'}
+            <Plus size={16} /> Add {hubTab === 'SERVICES' ? 'Service' : 'Item'}
           </button>
         </div>
       </div>
@@ -1287,7 +1323,7 @@ export default function InventoryView() {
                     onClick={() => openAdd('PHYSICAL', activeCatObj?.name === 'Uncategorized' ? '' : activeCatObj?.name)}
                     className="btn btn-primary"
                     style={{ fontSize: '0.8rem', padding: '0.4rem 0.85rem' }}>
-                    <Plus size={14} /> + Add Item to {activeCatObj?.name}
+                    <Plus size={14} /> Add Item to {activeCatObj?.name}
                   </button>
                 </div>
                 <div style={{ flex: 1, overflowY: 'auto' }}>
@@ -2080,13 +2116,33 @@ export default function InventoryView() {
                     Total Qty *
                   </label>
                   <input
-                    type="number"
-                    step="any"
-                    min="0.001"
+                    type="text"
+                    inputMode={isDiscreteUnit(adjUnit) ? "numeric" : "decimal"}
                     required
                     placeholder="0"
                     value={adjQty}
-                    onChange={(e) => setAdjQty(e.target.value)}
+                    onChange={(e) => {
+                      let val = e.target.value;
+                      if (isDiscreteUnit(adjUnit)) {
+                        val = val.replace(/[^0-9]/g, '');
+                      } else {
+                        val = val.replace(/[^0-9.]/g, '');
+                        const parts = val.split('.');
+                        if (parts.length > 2) val = parts[0] + '.' + parts.slice(1).join('');
+                      }
+                      setAdjQty(val);
+                    }}
+                    onBlur={(e) => {
+                      const val = e.target.value.trim();
+                      if (!val) return;
+                      if (isDiscreteUnit(adjUnit)) {
+                        const parsed = parseInt(val, 10);
+                        setAdjQty(isNaN(parsed) || parsed <= 0 ? '' : String(parsed));
+                      } else {
+                        const parsed = parseFloat(val);
+                        setAdjQty(isNaN(parsed) || parsed <= 0 ? '' : String(parsed));
+                      }
+                    }}
                     style={{
                       width: '100%',
                       padding: '0.5rem 0.7rem',
@@ -2105,7 +2161,14 @@ export default function InventoryView() {
                   </label>
                   <select
                     value={adjUnit}
-                    onChange={(e) => setAdjUnit(e.target.value)}
+                    onChange={(e) => {
+                      const newUnit = e.target.value;
+                      setAdjUnit(newUnit);
+                      if (isDiscreteUnit(newUnit) && adjQty) {
+                        const parsed = parseInt(adjQty, 10);
+                        setAdjQty(isNaN(parsed) || parsed <= 0 ? '' : String(parsed));
+                      }
+                    }}
                     style={{
                       width: '100%',
                       padding: '0.52rem 0.6rem',
@@ -2128,12 +2191,22 @@ export default function InventoryView() {
                     At Price (₹/{selectedProduct.unit})
                   </label>
                   <input
-                    type="number"
-                    step="any"
-                    min="0"
+                    type="text"
+                    inputMode="decimal"
                     placeholder="0.00"
                     value={adjAtPrice}
-                    onChange={(e) => setAdjAtPrice(e.target.value)}
+                    onChange={(e) => {
+                      let val = e.target.value.replace(/[^0-9.]/g, '');
+                      const parts = val.split('.');
+                      if (parts.length > 2) val = parts[0] + '.' + parts.slice(1).join('');
+                      setAdjAtPrice(val);
+                    }}
+                    onBlur={(e) => {
+                      const val = e.target.value.trim();
+                      if (val !== '' && !isNaN(Number(val))) {
+                        setAdjAtPrice(Number(val).toFixed(2));
+                      }
+                    }}
                     style={{
                       width: '100%',
                       padding: '0.5rem 0.7rem',
@@ -2153,6 +2226,8 @@ export default function InventoryView() {
                 const isSec = selectedProduct.secondaryUnit && Number(selectedProduct.conversionRate) > 0 && adjUnit === selectedProduct.secondaryUnit;
                 const baseDelta = isSec ? (rawVal / Number(selectedProduct.conversionRate)) : rawVal;
                 const preview = adjType === 'ADD' ? (current + baseDelta) : Math.max(0, current - baseDelta);
+                const isBaseDiscrete = isDiscreteUnit(selectedProduct.unit);
+                const fmtStock = (n) => isBaseDiscrete ? String(Math.round(n)) : parseFloat(n.toFixed(3)).toString();
                 return (
                   <div style={{
                     marginBottom: '1rem',
@@ -2165,12 +2240,12 @@ export default function InventoryView() {
                     justifyContent: 'space-between',
                     fontSize: '0.78rem'
                   }}>
-                    <span style={{ color: '#64748b' }}>Current: <strong>{current} {selectedProduct.unit}</strong></span>
+                    <span style={{ color: '#64748b' }}>Current: <strong>{fmtStock(current)} {selectedProduct.unit}</strong></span>
                     <span style={{ color: adjType === 'ADD' ? '#059669' : '#dc2626', fontWeight: 600 }}>
-                      {adjType === 'ADD' ? `+ ${baseDelta.toFixed(3)}` : `- ${baseDelta.toFixed(3)}`} {selectedProduct.unit}
+                      {adjType === 'ADD' ? `+ ${fmtStock(baseDelta)}` : `- ${fmtStock(baseDelta)}`} {selectedProduct.unit}
                     </span>
                     <span style={{ color: '#0f172a', fontWeight: 700 }}>
-                      New Stock: <strong style={{ color: preview <= 0 ? '#dc2626' : '#059669' }}>{preview.toFixed(3)} {selectedProduct.unit}</strong>
+                      New Stock: <strong style={{ color: preview <= 0 ? '#dc2626' : '#059669' }}>{fmtStock(preview)} {selectedProduct.unit}</strong>
                     </span>
                   </div>
                 );
@@ -2574,13 +2649,13 @@ export default function InventoryView() {
                           Sale Price ({profileCurrency}) *
                         </label>
                         <input
-                          type="number"
-                          step="any"
-                          min="0"
+                          type="text"
+                          inputMode="decimal"
                           required
                           placeholder="0.00"
                           value={form.sellingPrice}
-                          onChange={(e) => setForm(prev => ({ ...prev, sellingPrice: e.target.value }))}
+                          onChange={(e) => handlePriceFieldChange('sellingPrice', e.target.value)}
+                          onBlur={() => handlePriceFieldBlur('sellingPrice')}
                           style={{ width: '100%', padding: '0.48rem 0.65rem', fontSize: '0.9rem', fontWeight: 700, borderRadius: '6px', border: '1px solid #a7f3d0', boxSizing: 'border-box' }}
                         />
                       </div>
@@ -2601,12 +2676,12 @@ export default function InventoryView() {
                           MRP ({profileCurrency})
                         </label>
                         <input
-                          type="number"
-                          step="any"
-                          min="0"
-                          placeholder="Optional MRP"
+                          type="text"
+                          inputMode="decimal"
+                          placeholder="0.00"
                           value={form.mrp}
-                          onChange={(e) => setForm(prev => ({ ...prev, mrp: e.target.value }))}
+                          onChange={(e) => handlePriceFieldChange('mrp', e.target.value)}
+                          onBlur={() => handlePriceFieldBlur('mrp')}
                           style={{ width: '100%', padding: '0.48rem 0.65rem', fontSize: '0.85rem', borderRadius: '6px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }}
                         />
                       </div>
@@ -2619,12 +2694,12 @@ export default function InventoryView() {
                           Wholesale Price ({profileCurrency})
                         </label>
                         <input
-                          type="number"
-                          step="any"
-                          min="0"
+                          type="text"
+                          inputMode="decimal"
                           placeholder="0.00"
                           value={form.wholesalePrice}
-                          onChange={(e) => setForm(prev => ({ ...prev, wholesalePrice: e.target.value }))}
+                          onChange={(e) => handlePriceFieldChange('wholesalePrice', e.target.value)}
+                          onBlur={() => handlePriceFieldBlur('wholesalePrice')}
                           style={{ width: '100%', padding: '0.45rem 0.65rem', fontSize: '0.85rem', borderRadius: '6px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }}
                         />
                       </div>
@@ -2665,12 +2740,12 @@ export default function InventoryView() {
                       </div>
                       <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '0.5rem' }}>
                         <input
-                          type="number"
-                          step="any"
-                          min="0"
-                          placeholder="Purchase Price"
+                          type="text"
+                          inputMode="decimal"
+                          placeholder="0.00"
                           value={form.purchasePrice}
-                          onChange={(e) => setForm(prev => ({ ...prev, purchasePrice: e.target.value }))}
+                          onChange={(e) => handlePriceFieldChange('purchasePrice', e.target.value)}
+                          onBlur={() => handlePriceFieldBlur('purchasePrice')}
                           style={{ width: '100%', padding: '0.48rem 0.65rem', fontSize: '0.88rem', fontWeight: 600, borderRadius: '6px', border: '1px solid #bfdbfe', boxSizing: 'border-box' }}
                         />
                         <select
@@ -2739,12 +2814,12 @@ export default function InventoryView() {
                         At Price ({profileCurrency}/{form.unit})
                       </label>
                       <input
-                        type="number"
-                        step="any"
-                        min="0"
-                        placeholder="Cost per unit"
+                        type="text"
+                        inputMode="decimal"
+                        placeholder="0.00"
                         value={form.openingStockPrice}
-                        onChange={(e) => setForm(prev => ({ ...prev, openingStockPrice: e.target.value }))}
+                        onChange={(e) => handlePriceFieldChange('openingStockPrice', e.target.value)}
+                        onBlur={() => handlePriceFieldBlur('openingStockPrice')}
                         style={{ width: '100%', padding: '0.5rem 0.7rem', fontSize: '0.88rem', borderRadius: '6px', border: '1px solid #d1d5db', boxSizing: 'border-box' }}
                       />
                     </div>
