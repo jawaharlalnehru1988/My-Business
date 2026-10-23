@@ -15,6 +15,7 @@ import {
 import { toast } from './Toast';
 import ClientModal from './ClientModal';
 import SupplierModal from './SupplierModal';
+import ItemModal from './ItemModal';
 import ThermalPreviewModal from './ThermalPreviewModal';
 import InvoicePreviewModal from './InvoicePreviewModal';
 import { openWhatsAppShare } from '../utils/share';
@@ -148,6 +149,9 @@ export default function VyaparInvoiceEditor({
   const [allParties, setAllParties] = useState([]);
   const [allProducts, setAllProducts] = useState([]);
   const [showPartyModal, setShowPartyModal] = useState(false);
+  const [showItemModal, setShowItemModal] = useState(false);
+  const [itemModalTargetRowIdx, setItemModalTargetRowIdx] = useState(null);
+  const [itemModalInitialName, setItemModalInitialName] = useState('');
   const [showOcrModal, setShowOcrModal] = useState(false);
 
   // Dynamic units list merging default Vyapar units + custom user units
@@ -510,6 +514,80 @@ export default function VyaparInvoiceEditor({
       toast.success(`${isPurchase ? 'Supplier' : 'Customer'} added & selected!`);
     } catch (e) {
       toast.error('Failed to save party: ' + (e.message || 'Unknown error'));
+    }
+  };
+
+  // Open Add New Item Modal
+  const handleOpenItemModal = (targetRowIdx = null, initialName = '') => {
+    setItemModalTargetRowIdx(targetRowIdx);
+    setItemModalInitialName(initialName || (targetRowIdx !== null ? (items[targetRowIdx]?.name || '') : ''));
+    setShowItemModal(true);
+  };
+
+  // Quick Add Item Modal Save Handler
+  const handleSaveNewItem = async (savedProd) => {
+    try {
+      const prods = await getAllProducts();
+      setAllProducts(prods || []);
+
+      let targetIdx = itemModalTargetRowIdx;
+      if (targetIdx === null || targetIdx === undefined) {
+        const emptyIdx = items.findIndex(r => !(r.name || '').trim() && (Number(r.rate) || 0) === 0);
+        if (emptyIdx !== -1) {
+          targetIdx = emptyIdx;
+        } else {
+          targetIdx = items.length;
+          addRow();
+        }
+      }
+
+      setItems(prev => {
+        const copy = [...prev];
+        while (copy.length <= targetIdx) {
+          copy.push({
+            id: Math.random().toString(36).substring(2, 9),
+            productId: null,
+            name: '',
+            hsn: '',
+            quantity: 1,
+            freeQty: 0,
+            unit: 'PCS',
+            rate: 0,
+            taxPercent: 18,
+            cessPercent: 0,
+            discountPercent: 0,
+            discountAmount: 0,
+            taxAmount: 0,
+            amount: 0
+          });
+        }
+
+        const defaultRate = isPurchase
+          ? (Number(savedProd.purchasePrice) || Number(savedProd.rate) || 0)
+          : (Number(savedProd.sellingPrice) || Number(savedProd.rate) || 0);
+
+        const row = {
+          ...copy[targetIdx],
+          productId: savedProd.id || null,
+          name: savedProd.name || '',
+          hsn: savedProd.hsn || '',
+          unit: (savedProd.unit || 'PCS').toUpperCase(),
+          rate: defaultRate,
+          taxPercent: savedProd.taxPercent !== undefined && savedProd.taxPercent !== null ? Number(savedProd.taxPercent) : 18,
+          cessPercent: savedProd.cessPercent !== undefined && savedProd.cessPercent !== null ? Number(savedProd.cessPercent) : 0,
+        };
+
+        const { taxAmount, amount } = calculateRowAmount(row, taxInclusive);
+        row.amount = amount;
+        row.taxAmount = taxAmount;
+        copy[targetIdx] = row;
+        return copy;
+      });
+
+      setShowItemModal(false);
+      toast.success(`Item "${savedProd.name}" added & selected!`);
+    } catch (e) {
+      toast.error('Failed to apply item: ' + (e.message || 'Unknown error'));
     }
   };
 
@@ -1710,9 +1788,31 @@ export default function VyaparInvoiceEditor({
                 <ScanBarcode size={15} style={{ margin: '0 auto', color: showBarcodeBar ? '#2563eb' : '#64748b' }} />
               </th>
               <th style={{ width: '36px' }}>#</th>
-              <th style={{ minWidth: '210px', textAlign: 'left' }}>
+              <th style={{ minWidth: '220px', textAlign: 'left' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span>ITEM</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span>ITEM</span>
+                    <button
+                      type="button"
+                      onClick={() => handleOpenItemModal(null)}
+                      title="Add New Item to Catalog"
+                      style={{
+                        background: '#eff6ff',
+                        border: '1px solid #bfdbfe',
+                        color: '#2563eb',
+                        borderRadius: '4px',
+                        padding: '2px 6px',
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '2px',
+                        fontSize: '0.65rem',
+                        fontWeight: 700
+                      }}
+                    >
+                      <Plus size={11} /> New Item
+                    </button>
+                  </div>
                   <button
                     type="button"
                     onClick={() => setShowFreeQtyCol(prev => !prev)}
@@ -1786,14 +1886,39 @@ export default function VyaparInvoiceEditor({
 
                 {/* Item Name */}
                 <td>
-                  <input
-                    type="text"
-                    className="vyapar-cell-input"
-                    list={`vyapar-prods-${idx}`}
-                    value={row.name}
-                    onChange={e => updateItem(idx, 'name', e.target.value)}
-                    placeholder="Enter or select item"
-                  />
+                  <div style={{ display: 'flex', alignItems: 'center', position: 'relative', width: '100%' }}>
+                    <input
+                      type="text"
+                      className="vyapar-cell-input"
+                      list={`vyapar-prods-${idx}`}
+                      value={row.name}
+                      onChange={e => updateItem(idx, 'name', e.target.value)}
+                      placeholder="Enter or select item"
+                      style={{ flex: 1, paddingRight: '24px' }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleOpenItemModal(idx, row.name)}
+                      title="Add new item to catalog"
+                      style={{
+                        position: 'absolute',
+                        right: '3px',
+                        background: '#eff6ff',
+                        border: '1px solid #bfdbfe',
+                        color: '#2563eb',
+                        borderRadius: '3px',
+                        width: '18px',
+                        height: '18px',
+                        padding: 0,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <Plus size={12} />
+                    </button>
+                  </div>
                   <datalist id={`vyapar-prods-${idx}`}>
                     {allProducts.map(p => {
                       const r = getProductDefaultRate(p);
@@ -2435,6 +2560,18 @@ export default function VyaparInvoiceEditor({
           supplier={null}
           isEditing={false}
           defaultCountry={activeProfile?.country || 'India'}
+        />
+      )}
+
+      {/* QUICK ADD ITEM MODAL */}
+      {showItemModal && (
+        <ItemModal
+          show={showItemModal}
+          onClose={() => setShowItemModal(false)}
+          onSave={handleSaveNewItem}
+          initialName={itemModalInitialName}
+          entryType={entryType}
+          defaultTaxPercent={18}
         />
       )}
 
