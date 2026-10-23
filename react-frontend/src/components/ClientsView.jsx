@@ -846,7 +846,7 @@ export default function ClientsView({ onEdit, onDuplicate, onNew }) {
             <Upload size={16} /> Import CSV
           </button>
           <button className="btn btn-primary" onClick={openAddClient} style={{ fontWeight: 700 }}>
-            <Plus size={18} /> + Add Party
+            <Plus size={18} /> Add Party
           </button>
         </div>
       </div>
